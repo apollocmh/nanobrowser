@@ -2,6 +2,7 @@
 // taken from the English catalogue. A missing key falls back to English.
 import { useSyncExternalStore } from 'react';
 import en from './locales/en.json';
+import { brand } from '@src/brand';
 
 export type MessageKey = keyof typeof en;
 export type Language = 'en' | 'zh_CN' | 'zh_TW';
@@ -44,7 +45,7 @@ export function currentLanguage(): Language {
 
 /** A string by key, with `{name}` placeholders filled from `params`. */
 export function t(key: MessageKey, params?: Record<string, string | number>): string {
-  const template = catalogue[key] ?? en[key] ?? key;
+  const template = (catalogue[key] ?? en[key] ?? key).replace(/Nanobrowser/g, brand.name);
   if (!params) return template;
   return template.replace(/\{(\w+)\}/g, (match, name: string) => (name in params ? String(params[name]) : match));
 }

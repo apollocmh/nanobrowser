@@ -34,6 +34,10 @@ const GROUPS: Record<string, AgentTool['group']> = {
   handle_dialog: 'acting',
   fill_form: 'acting',
   hover: 'acting',
+  mouse_down: 'acting',
+  mouse_move: 'acting',
+  mouse_up: 'acting',
+  drag: 'acting',
   scroll: 'acting',
   tabs: 'acting',
   ask_user: 'working',
@@ -75,7 +79,43 @@ function schemaWithout(schema: unknown, hidden: string[]): unknown {
     s.properties = props;
     if (Array.isArray(s.required)) s.required = (s.required as string[]).filter(r => !hidden.includes(r));
   }
-  return s;
+  return compactParameters(s);
+}
+
+// These argument conventions are stated once in the system prompt. Repeating the same paragraph in every nested
+// target and postcondition made the fixed tool prefix exceed the entire input budget of a 16k model after dragging
+// was added. Keep every validation keyword and every tool-specific annotation; only remove those shared annotations.
+const SHARED_DESCRIPTIONS = new Set([
+  "Default: the session's active tab",
+  'Human-readable purpose, shown to the user and kept in the audit log',
+  'A postcondition checked after the action settles',
+  'The page URL contains this text',
+  'This text is on the page',
+  'This text is no longer on the page',
+  "The target's value equals this",
+  'The target is checked (true) or unchecked (false)',
+  'The target is no longer in the page',
+  'The element to act on: a ref, or a role and name that must match exactly one element',
+  'A ref from the latest observation, such as "e12"',
+  'Accessibility role, such as "button" or "link"',
+  'Accessible name; matched exactly after whitespace is collapsed',
+  'Zero-based index among the matches, in document order',
+  'Only match inside the element with this ref',
+  'CSS selector (capability "selector")',
+  'CSS pixels of the last screenshot (capability "vision")',
+  'Position inside the target; default: its centre',
+  'Fraction across the target quad; 0 is left, 1 is right',
+  'Fraction down the target quad; 0 is top, 1 is bottom',
+]);
+
+export function compactParameters(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map(compactParameters);
+  if (!schema || typeof schema !== 'object') return schema;
+  return Object.fromEntries(
+    Object.entries(schema)
+      .filter(([key, value]) => key !== 'description' || typeof value !== 'string' || !SHARED_DESCRIPTIONS.has(value))
+      .map(([key, value]) => [key, compactParameters(value)]),
+  );
 }
 
 export const DONE_TOOL: AgentTool = {
@@ -149,6 +189,10 @@ export const PAGE_ACTIONS = new Set([
   'type',
   'press',
   'hover',
+  'mouse_down',
+  'mouse_move',
+  'mouse_up',
+  'drag',
   'scroll',
   'navigate',
   'handle_dialog',

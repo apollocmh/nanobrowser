@@ -67,7 +67,7 @@ export function App() {
             {SECTIONS.map(s => (
               <Fragment key={s.id}>
                 {/* Help, a link to the website's help pages in a new tab, sits above About; it is not a section. */}
-                {s.id === 'about' ? (
+                {s.id === 'about' && websiteUrl('/docs', 'settings') ? (
                   <a
                     href={websiteUrl('/docs', 'settings')}
                     target="_blank"

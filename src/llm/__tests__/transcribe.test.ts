@@ -60,6 +60,17 @@ describe('voice models', () => {
     expect((form.get('file') as File).type).toBe('audio/wav');
   });
 
+  it('do not let a process environment redirect the key to another endpoint', async () => {
+    vi.stubEnv('OPENAI_BASE_URL', 'https://example.invalid/v1');
+    try {
+      const { fetch, requests } = fakeFetch({ text: 'ok' });
+      await transcribeAudio({ kind: 'openai', modelName: 'gpt-transcribe', apiKey: 'sk-test' }, WAV, { fetch });
+      expect(requests[0].url).toBe('https://api.openai.com/v1/audio/transcriptions');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('send the recording to Gemini’s transcription model', async () => {
     const { fetch, requests } = fakeFetch({ steps: [{ content: [{ type: 'text', text: '订两个人的位子。' }] }] });
     const text = await transcribeAudio({ kind: 'gemini', modelName: 'gemini-3.5-transcribe', apiKey: 'gm-test' }, WAV, {

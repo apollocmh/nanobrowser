@@ -51,7 +51,9 @@ export function BrowserFeaturesCard() {
       title={t('perm.features.title')}
       description={t('perm.features.cardHint')}
       className="flex flex-col gap-5">
-      {FEATURES.map(f => (
+      {FEATURES.filter(
+        f => chrome.runtime.getManifest().manifest_version !== 2 || f.label !== 'perm.features.tabGroups',
+      ).map(f => (
         <SettingsRow
           key={f.label}
           label={t(f.label)}

@@ -222,6 +222,75 @@ export async function read(
 
 export async function screenshot(ctx: ToolContext, args: ScreenshotArgs): Promise<ToolOutcome<ScreenshotData>> {
   const attachment = await ctx.attach();
+  if (!attachment.page.prepareScreenshot) return screenshotCurrent(ctx, args);
+  const tab = ctx.tab();
+  const frames = await attachment.topology.frames();
+  const root = frames[0];
+  if (!root) throw new LayerError('CAPTURE_FAILED', 'The page has no document to capture');
+  const viewport = await tab.probe!.callGlobal<{ width: number; height: number }>(root, 'viewport');
+  const before = await scrollOffset(attachment.cdp, undefined);
+  let clip;
+  if (args.ref) {
+    const record = lookupRef(ctx.controller.registry, ctx.session.known, args.ref, tab.tabId);
+    const frame = frames.find(f => f.frameId === record.frameId);
+    if (!frame) throw new LayerError('FRAME_DETACHED', `The frame of ${args.ref} is gone`);
+    const quad = await topLevelQuad(attachment.cdp, frames, frame, record.backendNodeId, f =>
+      tab.probe!.callGlobal(f, 'viewport'),
+    );
+    if (!quad) throw new LayerError('NOT_VISIBLE', `${args.ref} has no box to capture`);
+    const box = quadBounds(quad);
+    clip = { x: box.x + before.x, y: box.y + before.y, width: box.width, height: box.height };
+  }
+  const prepared = await attachment.page.prepareScreenshot({ fullPage: !args.ref && args.fullPage, clip }, viewport);
+  let outcome!: ToolOutcome<ScreenshotData>;
+  let captureFailure: { error: unknown } | undefined;
+  try {
+    if (prepared.changed) tab.last = undefined;
+    // Capture and mask while the same temporary layout is still in effect.
+    outcome = await screenshotCurrent(ctx, args);
+  } catch (error) {
+    captureFailure = { error };
+  }
+  // Restoration is mandatory even when capture fails. A restoration failure takes precedence,
+  // since no image is safe to return while the page is left in the temporary layout.
+  try {
+    await prepared.restore();
+    if (prepared.changed) {
+      const current = (await attachment.topology.frames())[0];
+      if (!current || current.loaderId !== root.loaderId) throw new Error('The page navigated during capture');
+      await tab.probe!.callGlobal(root, 'restoreScroll', before.x, before.y);
+      const after = await scrollOffset(attachment.cdp, undefined);
+      const size = await tab.probe!.callGlobal<{ width: number; height: number }>(root, 'viewport');
+      if (
+        Math.abs(after.x - before.x) > 1 ||
+        Math.abs(after.y - before.y) > 1 ||
+        Math.abs(size.width - viewport.width) > 1 ||
+        Math.abs(size.height - viewport.height) > 1
+      )
+        throw new Error('The viewport or scroll position did not return to its original value');
+    }
+  } catch (error) {
+    prepared.capture.restored = false;
+    throw new LayerError(
+      'CAPTURE_FAILED',
+      `The screenshot was not returned because restoration failed: ${String(error)}`,
+    );
+  } finally {
+    if (prepared.changed) tab.last = undefined;
+  }
+  if (captureFailure) throw captureFailure.error;
+  if (outcome.data) outcome.data.capture = prepared.capture;
+  if (prepared.changed) {
+    const notice =
+      'Legacy full-page capture temporarily changed the viewport. The viewport and scroll were restored; page reactions to resizing cannot be undone.';
+    outcome.lines = [...(outcome.lines ?? []), notice];
+    outcome.notices = [...(outcome.notices ?? []), notice];
+  }
+  return outcome;
+}
+
+async function screenshotCurrent(ctx: ToolContext, args: ScreenshotArgs): Promise<ToolOutcome<ScreenshotData>> {
+  const attachment = await ctx.attach();
   const tab = ctx.tab();
   const { cdp } = attachment;
   const frames = await attachment.topology.frames();

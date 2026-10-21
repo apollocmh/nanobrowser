@@ -149,6 +149,13 @@ export function GeneralSection() {
             onChange={on => void settingsStorage.set(s => ({ ...s, pageBorder: on }))}
           />
         </SettingsRow>
+        <SettingsRow label={t('general.virtualMouse')} description={t('general.virtualMouseHint')}>
+          <Switch
+            aria-label={t('general.virtualMouse')}
+            checked={settings.virtualMouse}
+            onChange={on => void settingsStorage.set(s => ({ ...s, virtualMouse: on }))}
+          />
+        </SettingsRow>
       </SettingsCard>
       <KeyboardShortcut />
     </div>

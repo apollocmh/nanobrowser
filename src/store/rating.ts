@@ -3,6 +3,7 @@
 // Maybe later asks again 30 days later, once; Leave a rating, or a second Maybe later, ends it. The state stays on this
 // device and nothing in it is sent.
 import { createStorage } from './storage';
+import { brand } from '@src/brand';
 
 /** Written only by the worker, when a run ends. */
 export interface RatingUsage {
@@ -100,12 +101,7 @@ export function answerRating(answer: RatingAnswer, choice: 'rate' | 'later', now
   return { later, done: later >= MAX_LATER, notBefore: addDays(localDay(now), LATER_DAYS), at: now.getTime() };
 }
 
-const CHROME_STORE =
-  'https://chromewebstore.google.com/detail/nanobrowser-ai-web-agent/imbddededgmcgfhfpcjmijokokekbkal/reviews';
-const EDGE_STORE =
-  'https://microsoftedge.microsoft.com/addons/detail/nanobrowser-ai-web-agent/ajdioenfpgabnjlclgckbbnjjhdnjkhn';
-
 /** The store page to rate on: Edge's add-ons store in Edge, the Chrome Web Store anywhere else. */
 export function ratingUrl(userAgent: string): string {
-  return userAgent.includes('Edg/') ? EDGE_STORE : CHROME_STORE;
+  return userAgent.includes('Edg/') ? brand.edgeStore : brand.chromeStore;
 }

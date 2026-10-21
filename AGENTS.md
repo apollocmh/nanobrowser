@@ -35,7 +35,7 @@ The layer's invariants hold for all code in it. Read them before changing percep
 3. **Retries happen before dispatch.** Once an input event has been sent, the layer does not send another on its own.
 4. **No hidden substitution.** A different node or a different mechanism is chosen by rule before dispatch and named in the receipt.
 5. **Three outcomes, reported separately.** Input dispatched; page reacted; expected state reached.
-6. **Observation is read-only.** Capturing state does not change the page.
+6. **Observation is read-only.** Capturing state does not change the page. The user explicitly authorized one exception for the Chromium 80 build: full-page screenshots (including offscreen element crops from them) may temporarily change the viewport when legacy CDP cannot capture beyond it. Capture and redact in that same layout, restore viewport and scroll in `finally`, invalidate cached observations, and disclose the mechanism and possible page reactions. Never return an image if redaction or restoration fails.
 7. **Degrade loudly.** Partial captures and truncation are stated in the result.
 8. **Bounded everything.** Every command, wait and list has a budget. The one wait without a clock is a confirmation the host lets wait for the user; it still ends on Stop, when the tab closes or when the session ends.
 9. **State is disposable.** A service worker restart, a debugger detach and a navigation invalidate layer state cleanly.

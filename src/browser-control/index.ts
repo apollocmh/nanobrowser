@@ -25,6 +25,13 @@ export type { Capture, FrameCapture } from './core/perception/capture';
 export { sendRaw, CdpCommandError, CdpTimeoutError, PAGE_SESSION_ALIAS } from './host/cdp-session';
 export { chromeAttacher, ChromeTabConnection, isRestrictedUrl } from './host/connection';
 export { chromeTabHost, chromeEpochStore } from './host/chrome-host';
+export {
+  dispatchInputEvent,
+  subscribeInputEvents,
+  subscribeScreenshotDecorations,
+  aroundScreenshot,
+} from './host/input-observer';
+export type { InputEvent, InputPhase } from './host/input-observer';
 export { PuppeteerFrameTopology, listFrames, readFrameTree, checkFrameAccessors } from './host/frame-topology';
 export type { FrameInfo, AccessorCheck } from './host/frame-topology';
 

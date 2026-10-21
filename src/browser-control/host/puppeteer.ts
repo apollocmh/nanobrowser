@@ -6,6 +6,8 @@ import type { Browser } from 'puppeteer-core/internal/api/Browser.js';
 import type { Frame } from 'puppeteer-core/internal/api/Frame.js';
 import type { Page } from 'puppeteer-core/internal/api/Page.js';
 import { _keyDefinitions } from 'puppeteer-core/internal/common/USKeyboardLayout.js';
+import { browserMajor } from './legacy-cdp';
+import { LegacyExtensionTransport } from './legacy-transport';
 
 export type { Browser, Frame, KeyInput, Page, PageEvent };
 
@@ -21,11 +23,11 @@ export interface PuppeteerConnection {
 }
 
 export async function connectTab(tabId: number): Promise<PuppeteerConnection> {
-  const transport = await ExtensionTransport.connectTab(tabId);
+  const transport = await (browserMajor() < 125 ? LegacyExtensionTransport : ExtensionTransport).connectTab(tabId);
   // The debugger is attached from here on: any failure detaches it again, or the tab could not be attached later.
   let browser: Browser | undefined;
   try {
-    browser = await connect({ transport, defaultViewport: null, protocol: 'cdp' as ProtocolType });
+    browser = await connect({ transport, defaultViewport: null, protocol: 'cdp' as ProtocolType, issuesEnabled: false });
     const [page] = await browser.pages();
     if (!page) throw new Error(`No page target for tab ${tabId}`);
     return { tabId, browser, page };

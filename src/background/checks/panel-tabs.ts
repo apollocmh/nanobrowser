@@ -40,13 +40,28 @@ defineCheck({
       await panel(id, 'type-send', { text: 'Open the effects page' });
       await waitForText(id, 'Opened the effects page.');
       const startTab = await chrome.tabs.get(id);
-      if (startTab.groupId === -1) throw new Error('the start tab is not in a group');
-      const group = await chrome.tabGroups.get(startTab.groupId);
-      const inGroup = await chrome.tabs.query({ groupId: startTab.groupId });
+      const nativeGroups = typeof chrome.tabs.group === 'function';
+      const scoped = async () =>
+        (
+          (await chrome.storage.session.get('nb.scope'))['nb.scope'] as {
+            tabs: Record<string, { conversationId: string }>;
+          }
+        ).tabs;
+      const conversationId = (await scoped())[id]?.conversationId;
+      if (!conversationId) throw new Error('the start tab has no conversation binding');
+      const scopeIds = new Set(
+        Object.entries(await scoped())
+          .filter(([, value]) => value.conversationId === conversationId)
+          .map(([tabId]) => Number(tabId)),
+      );
+      if (nativeGroups && startTab.groupId === -1) throw new Error('the start tab is not in a group');
+      const inGroup = nativeGroups
+        ? await chrome.tabs.query({ groupId: startTab.groupId })
+        : (await chrome.tabs.query({})).filter(tab => tab.id !== undefined && scopeIds.has(tab.id));
       const agentTab = inGroup.find(t => t.url?.includes('c-effects'));
-      report.group = group.title;
+      report.group = nativeGroups ? (await chrome.tabGroups.get(startTab.groupId)).title : 'internal session tab list';
       report.groupTabs = inGroup.length;
-      if (!agentTab) throw new Error('the agent’s tab is not in the group');
+      if (!agentTab) throw new Error('the agent’s tab is not in the conversation scope');
       // The chip follows the page as it loads: its title, not the blank page the tab was opened on.
       report.agentChip = await until(
         async () => (await panel(id, 'read')).body.split('\n').find(l => l.startsWith('Effects')),
@@ -75,8 +90,11 @@ defineCheck({
       await sleep(400);
       await panel(id, 'click', { label: 'Fixtures' });
       await until(
-        async () => (await chrome.tabs.get(other.id!)).groupId,
-        g => g === startTab.groupId,
+        async () =>
+          nativeGroups
+            ? (await chrome.tabs.get(other.id!)).groupId === startTab.groupId
+            : (await scoped())[other.id!]?.conversationId === conversationId,
+        shared => shared,
         'shared with @',
       );
       const chips = await until(
@@ -87,7 +105,8 @@ defineCheck({
       report.chips = chips.split('\n').filter(l => /Fixtures|Effects/.test(l));
 
       // Dragged out of the group: unshared, and the chip goes.
-      await chrome.tabs.ungroup(other.id!);
+      if (nativeGroups) await chrome.tabs.ungroup(other.id!);
+      else await panel(id, 'click', { label: 'Remove Fixtures from this conversation' });
       await until(
         async () => (await panel(id, 'read')).body,
         b => !b.split('\n').some(l => l === 'Fixtures'),
@@ -107,7 +126,8 @@ defineCheck({
         v => v,
         'agent tab closed',
       );
-      report.startUngrouped = (await chrome.tabs.get(id)).groupId === -1;
+      report.startUngrouped = nativeGroups ? (await chrome.tabs.get(id)).groupId === -1 : !(await scoped())[id];
+      if (!report.startUngrouped) throw new Error('deleting the conversation left its start tab bound');
       return report;
     } finally {
       for (const t of [view.id, start.id, other.id]) await chrome.tabs.remove(t!).catch(() => undefined);

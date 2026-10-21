@@ -1,3 +1,4 @@
+import { brand } from '@src/brand';
 // Settings, provider configurations and API keys in chrome.storage.local. Keys sit under a key of their own: they
 // are never exported and never logged.
 import type { ProviderKind } from '../llm/providers';
@@ -37,6 +38,8 @@ export interface Settings {
   analyticsStats: boolean;
   /** A glowing border on the pages a working run acts on. */
   pageBorder: boolean;
+  /** Show the cursor and trail of actual CDP mouse operations. */
+  virtualMouse: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -53,9 +56,10 @@ export const DEFAULT_SETTINGS: Settings = {
   autoNoticeShown: false,
   agentTabsOnEnd: 'ask',
   onboarded: false,
-  analyticsPing: true,
-  analyticsStats: true,
+  analyticsPing: brand.analyticsEnabled,
+  analyticsStats: brand.analyticsEnabled,
   pageBorder: true,
+  virtualMouse: true,
 };
 
 /** Stored settings over the defaults, so a field added later has its default. */

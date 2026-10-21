@@ -1,11 +1,12 @@
 // Puppeteer's remaining jobs: keyboard input with its key definitions, navigation with load waits.
 // Screenshots are taken with a raw Page.captureScreenshot, which leaves the viewport untouched.
-import type { CdpPort, PagePort, ScreenshotOptions } from '../core/ports';
+import type { CdpPort, PagePort, ScreenshotCapture, ScreenshotOptions } from '../core/ports';
 import { LayerError } from '../protocol/errors';
 import { splitChord } from '../core/interaction/keys';
 import { quote } from '../core/text';
 import { isKnownKey } from './puppeteer';
 import type { KeyInput, Page } from './puppeteer';
+import { browserMajor } from './legacy-cdp';
 
 const MODIFIERS = new Set(['Alt', 'Control', 'Meta', 'Shift', 'ControlOrMeta']);
 
@@ -27,24 +28,79 @@ export class PuppeteerPagePort implements PagePort {
     private readonly cdp: CdpPort,
   ) {}
 
+  async prepareScreenshot(options: ScreenshotOptions, viewport: { width: number; height: number }) {
+    const capture: ScreenshotCapture = { method: 'native', pageMayHaveReacted: false, restored: true };
+    if (browserMajor() >= 90 || (!options.fullPage && !options.clip))
+      return { changed: false, capture, restore: async () => {} };
+    const metrics = await this.cdp.send<{
+      cssContentSize: { width: number; height: number };
+      cssLayoutViewport: { pageX: number; pageY: number };
+      visualViewport?: { zoom?: number };
+    }>(undefined, 'Page.getLayoutMetrics');
+    const clip = options.clip;
+    if (
+      clip &&
+      clip.x >= metrics.cssLayoutViewport.pageX &&
+      clip.y >= metrics.cssLayoutViewport.pageY &&
+      clip.x + clip.width <= metrics.cssLayoutViewport.pageX + viewport.width &&
+      clip.y + clip.height <= metrics.cssLayoutViewport.pageY + viewport.height
+    )
+      return { changed: false, capture, restore: async () => {} };
+    const width = Math.ceil(Math.max(viewport.width, metrics.cssContentSize.width));
+    const height = Math.ceil(Math.max(viewport.height, metrics.cssContentSize.height));
+    if (width > 32767 || height > 32767 || width * height > 64_000_000)
+      throw new LayerError(
+        'CAPTURE_FAILED',
+        'Full-page screenshot exceeds the 64 million CSS pixel capture budget. Nothing was captured.',
+      );
+    const previous = this.page.viewport();
+    const zoom = metrics.visualViewport?.zoom ?? 1;
+    capture.method = 'viewport-override';
+    capture.pageMayHaveReacted = true;
+    capture.restored = false;
+    const restore = async () => {
+      if (previous) await this.page.setViewport(previous);
+      else await this.cdp.send(undefined, 'Emulation.clearDeviceMetricsOverride');
+      capture.restored = true;
+    };
+    try {
+      await this.cdp.send(undefined, 'Emulation.setDeviceMetricsOverride', {
+        mobile: false,
+        width: Math.ceil(width * zoom),
+        height: Math.ceil(height * zoom),
+        deviceScaleFactor: 0,
+      });
+    } catch (error) {
+      await restore();
+      throw error;
+    }
+    return { changed: true, capture, restore };
+  }
+
   async screenshot(options: ScreenshotOptions) {
     const params: Record<string, unknown> = { format: 'png' };
-    if (options.clip) {
-      params.clip = { ...options.clip, scale: 1 };
-      params.captureBeyondViewport = true;
-    } else if (options.fullPage) {
-      const metrics = await this.cdp.send<{ cssContentSize: { width: number; height: number } }>(
-        undefined,
-        'Page.getLayoutMetrics',
-      );
-      params.clip = {
+    if (options.clip || options.fullPage) {
+      const metrics = await this.cdp.send<{
+        cssContentSize: { width: number; height: number };
+        visualViewport?: { zoom?: number };
+      }>(undefined, 'Page.getLayoutMetrics');
+      const clip = options.clip ?? {
         x: 0,
         y: 0,
         width: metrics.cssContentSize.width,
         height: metrics.cssContentSize.height,
+      };
+      // Chrome 125+ takes a page-zoomed clip: with browser zoom 1.25, a CSS-sized clip captures only the
+      // top-left 1/1.25 of the page. Older Chrome applies the zoom itself, so it keeps CSS coordinates.
+      const zoom = browserMajor() >= 125 ? (metrics.visualViewport?.zoom ?? 1) : 1;
+      params.clip = {
+        x: clip.x * zoom,
+        y: clip.y * zoom,
+        width: clip.width * zoom,
+        height: clip.height * zoom,
         scale: 1,
       };
-      params.captureBeyondViewport = true;
+      if (browserMajor() >= 90) params.captureBeyondViewport = true;
     }
     const { data } = await this.cdp.send<{ data: string }>(undefined, 'Page.captureScreenshot', params, 20_000);
     return { base64: data, ...pngSize(data) };

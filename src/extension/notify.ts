@@ -1,3 +1,4 @@
+import { brand } from '@src/brand';
 // Attention: when a run needs the user, or finishes, while no panel of its conversation is in view, a system
 // notification says so. Its text is the extension's own words and a site the extension read from the tab; never page or
 // model text. A click brings the run's tab to the front. Notifications need a permission the user may not have allowed
@@ -40,7 +41,12 @@ async function show(id: string, message: string, tabId: number | undefined): Pro
   if (!globalThis.chrome?.notifications) return;
   if (tabId !== undefined) tabOfNotification.set(id, tabId);
   await chrome.notifications
-    .create(id, { type: 'basic', iconUrl: chrome.runtime.getURL('/icon-128.png'), title: 'Nanobrowser', message })
+    .create(id, {
+      type: 'basic',
+      iconUrl: chrome.runtime.getURL(brand.icon),
+      title: brand.name,
+      message: message.replace(/Nanobrowser/g, brand.name),
+    })
     .catch(() => undefined);
 }
 

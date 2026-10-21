@@ -4,6 +4,10 @@ import { z } from 'zod';
 import {
   AskUserArgsSchema,
   ClickArgsSchema,
+  DragArgsSchema,
+  MouseDownArgsSchema,
+  MouseMoveArgsSchema,
+  MouseUpArgsSchema,
   FillFormArgsSchema,
   FindArgsSchema,
   HandleDialogArgsSchema,
@@ -37,6 +41,27 @@ export interface ToolSpec {
 }
 
 export const TOOL_SPECS: ToolSpec[] = [
+  ...[
+    [
+      'mouse_down',
+      'Press and hold the left mouse button on an observed target. Returns a bounded, session-bound gestureId.',
+      MouseDownArgsSchema,
+    ],
+    [
+      'mouse_move',
+      'Move a held gesture to another observed target. Requires the gestureId from mouse_down.',
+      MouseMoveArgsSchema,
+    ],
+    ['mouse_up', 'Release the held button on an observed target after rechecking safety.', MouseUpArgsSchema],
+    [
+      'drag',
+      'Drag an observed source onto an observed target with trusted mouse input in one tab lock.',
+      DragArgsSchema,
+    ],
+  ].map(
+    ([name, description, args]) =>
+      ({ name, description, args, readOnly: false, capability: 'core', available: true }) as ToolSpec,
+  ),
   {
     name: 'snapshot',
     description:

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" />
+  <title>SVG, shadow, scrolled and framed gesture controls</title>
+  <style>
+    body { margin: 12px; font: 14px Arial, sans-serif; }
+    h1 { margin: 0 0 12px; font-size: 20px; }
+    section { margin-bottom: 12px; }
+    .surface { position: relative; width: 400px; height: 70px; background: #e6eef9; border: 1px solid #36547c; touch-action: none; user-select: none; }
+    .node { position: absolute; top: 20px; left: 20px; width: 40px; height: 30px; background: #3866b0; pointer-events: none; }
+    #scroll-lane { width: 430px; height: 145px; overflow: auto; border: 1px solid #36547c; }
+    #scroll-content { height: 620px; padding: 220px 8px 0; box-sizing: border-box; }
+    iframe { display: block; width: 450px; height: 105px; border: 1px solid #36547c; }
+    svg { display: block; background: #e6eef9; touch-action: none; user-select: none; }
+  </style>
+  <main id="outer">
+    <h1>Trusted custom gesture controls</h1>
+    <section>
+      <svg id="svg-workspace" width="400" height="90" role="button" tabindex="0" aria-label="SVG workspace">
+        <rect id="svg-node" x="20" y="25" width="40" height="40" fill="#3866b0" style="pointer-events:none"></rect>
+      </svg>
+    </section>
+    <section><div id="shadow-host"></div><output id="shadow-value">Shadow value 10</output></section>
+    <section>
+      <div id="scroll-lane" role="region" aria-label="Scroll lane" tabindex="0">
+        <div id="scroll-content"><div id="scroll-workspace" class="surface" role="button" tabindex="0" aria-label="Scrolled workspace"><span class="node"></span></div></div>
+      </div>
+    </section>
+    <section><iframe id="control-frame" title="Pointer gesture frame"></iframe></section>
+    <section><div id="probe" class="surface" role="button" tabindex="0" aria-label="Recovery workspace"><span class="node"></span></div></section>
+  </main>
+  <script>
+    (function () {
+      var state = window.gestureControls = {
+        events: [],
+        svg: { x: 20, commits: 0 },
+        shadow: { value: 10, commits: 0 },
+        scroll: { x: 20, commits: 0 },
+        frame: { x: 20, commits: 0 },
+        recovery: { x: 20, commits: 0, clicks: 0 }
+      };
+      function record(surface, scope) {
+        ['pointerdown', 'pointermove', 'pointerup', 'mousedown', 'mousemove', 'mouseup', 'click'].forEach(function (type) {
+          surface.addEventListener(type, function (event) {
+            state.events.push({ scope: scope, type: type, trusted: event.isTrusted, buttons: event.buttons });
+            if (state.events.length > 1500) state.events.shift();
+          }, true);
+        });
+      }
+      function draggable(surface, scope, width, paint) {
+        var active = false;
+        var model = state[scope];
+        record(surface, scope);
+        surface.addEventListener('pointerdown', function (event) {
+          if (!event.isTrusted || event.button !== 0) return;
+          active = false;
+          var x = event.clientX - surface.getBoundingClientRect().left;
+          if (Math.abs(x - (model.x + 20)) > 25) return;
+          active = true;
+          surface.setPointerCapture(event.pointerId);
+          event.preventDefault();
+        });
+        surface.addEventListener('pointermove', function (event) {
+          if (!active || !event.isTrusted || !(event.buttons & 1)) return;
+          model.x = Math.max(0, Math.min(width - 40, event.clientX - surface.getBoundingClientRect().left - 20));
+          paint(model.x);
+        });
+        surface.addEventListener('pointerup', function (event) {
+          if (active && event.isTrusted && event.buttons === 0) model.commits++;
+          active = false;
+        });
+        surface.addEventListener('pointercancel', function () { active = false; });
+      }
+      if (location.search.indexOf('frame=1') !== -1) {
+        document.getElementById('outer').remove();
+        var surface = document.createElement('div');
+        surface.className = 'surface';
+        surface.setAttribute('role', 'button');
+        surface.setAttribute('tabindex', '0');
+        surface.setAttribute('aria-label', 'Frame workspace');
+        surface.innerHTML = '<span class="node"></span>';
+        document.body.appendChild(surface);
+        draggable(surface, 'frame', 400, function (x) { surface.firstChild.style.left = x + 'px'; });
+        return;
+      }
+      var svg = document.getElementById('svg-workspace');
+      draggable(svg, 'svg', 400, function (x) { document.getElementById('svg-node').setAttribute('x', x); });
+      var closed = document.getElementById('shadow-host').attachShadow({ mode: 'closed' });
+      closed.innerHTML = '<style>.track{position:relative;width:400px;height:60px;touch-action:none;user-select:none;background:#e6eef9;border:1px solid #36547c}.thumb{position:absolute;top:15px;left:10%;width:20px;height:30px;background:#3866b0;pointer-events:none}</style><div class="track" role="slider" tabindex="0" aria-label="Closed shadow slider" aria-valuemin="0" aria-valuemax="100" aria-valuenow="10"><span class="thumb"></span></div>';
+      var track = closed.querySelector('.track');
+      var sliding = false;
+      record(track, 'shadow');
+      function slide(event) {
+        if (!event.isTrusted) return;
+        var rect = track.getBoundingClientRect();
+        state.shadow.value = Math.round(Math.max(0, Math.min(100, (event.clientX - rect.left) / rect.width * 100)));
+        track.setAttribute('aria-valuenow', String(state.shadow.value));
+        track.firstChild.style.left = state.shadow.value + '%';
+        document.getElementById('shadow-value').textContent = 'Shadow value ' + state.shadow.value;
+      }
+      track.addEventListener('pointerdown', function (event) {
+        if (!event.isTrusted || event.button !== 0) return;
+        sliding = true;
+        track.setPointerCapture(event.pointerId);
+        slide(event);
+        event.preventDefault();
+      });
+      track.addEventListener('pointermove', function (event) { if (sliding && (event.buttons & 1)) slide(event); });
+      track.addEventListener('pointerup', function (event) {
+        if (sliding && event.isTrusted && event.buttons === 0) state.shadow.commits++;
+        sliding = false;
+      });
+      var scroll = document.getElementById('scroll-workspace');
+      draggable(scroll, 'scroll', 400, function (x) { scroll.firstElementChild.style.left = x + 'px'; });
+      var recovery = document.getElementById('probe');
+      draggable(recovery, 'recovery', 400, function (x) { recovery.firstElementChild.style.left = x + 'px'; });
+      recovery.addEventListener('click', function (event) { if (event.isTrusted) state.recovery.clicks++; });
+      document.getElementById('control-frame').src = location.pathname + '?frame=1';
+    })();
+  </script>
+</html>

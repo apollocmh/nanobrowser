@@ -14,6 +14,7 @@ import {
 import { useStorage } from '@src/ui/hooks';
 import { LogoMark } from '@src/ui/icons';
 import { t } from '@src/ui/i18n';
+import { brand } from '@src/brand';
 
 function answer(choice: 'rate' | 'later'): void {
   void ratingAnswerStorage.set(a => answerRating(a, choice, new Date()));
@@ -34,7 +35,14 @@ export function useRatingCard(
   if (shown.conversationId !== conversationId) setShown({ conversationId, at: Date.now() });
   const usage = useStorage(ratingStorage, NO_USAGE);
   const choice = useStorage(ratingAnswerStorage, NO_ANSWER);
-  if (active || waiting || shown.conversationId !== conversationId) return false;
+  if (
+    !brand.ratingEnabled ||
+    !ratingUrl(navigator.userAgent) ||
+    active ||
+    waiting ||
+    shown.conversationId !== conversationId
+  )
+    return false;
   const since = Math.max(shown.at, startedAt ? Date.parse(startedAt) : 0);
   return ratingShowsIn(usage, choice, conversationId, since, new Date());
 }

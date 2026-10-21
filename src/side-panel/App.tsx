@@ -40,7 +40,6 @@ const NO_KEYS: Record<string, string> = {};
 
 /** The starters a new conversation offers when no shortcut is pinned: a short label and the text it sends. */
 const STARTERS = [
-  { label: 'panel.starter.star', text: 'panel.starter.starText' },
   { label: 'panel.starter.summarize', text: 'panel.starter.summarizeText' },
   { label: 'panel.starter.news', text: 'panel.starter.newsText' },
 ] as const;
@@ -354,7 +353,7 @@ export function App() {
         className={`flex items-center gap-1 border-b px-2 py-1.5 ${empty && state.loaded ? 'border-transparent' : 'border-nb-border/60'}`}>
         {/* The mark opens the website in a new tab. */}
         <a
-          href={websiteUrl('/', 'side-panel')}
+          href={websiteUrl('/', 'side-panel') || undefined}
           target="_blank"
           rel="noreferrer"
           title={t('panel.website')}

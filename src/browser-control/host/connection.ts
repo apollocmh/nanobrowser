@@ -7,6 +7,7 @@ import { connectTab, disconnectTab } from './puppeteer';
 import type { PuppeteerConnection } from './puppeteer';
 import { PuppeteerFrameTopology } from './frame-topology';
 import { PuppeteerPagePort } from './page-port';
+import { browserMajor, legacyChannel } from './legacy-cdp';
 
 type EventHandler = (params: unknown, sessionId: SessionId) => void;
 
@@ -34,6 +35,7 @@ function listen() {
   listening = true;
   chrome.debugger.onEvent.addListener((source, method, params) => {
     if (source.tabId === undefined) return;
+    if (browserMajor() < 125) return; // The legacy channel unwraps child envelopes before fan-out.
     connections.get(source.tabId)?.dispatch(normalizeSessionId(source.sessionId), method, params);
   });
   chrome.debugger.onDetach.addListener((source, reason) => {
@@ -43,6 +45,7 @@ function listen() {
 }
 
 class ChromeCdpPort implements CdpPort {
+  readonly capabilities = { nativeDrag: browserMajor() >= 117 };
   constructor(private readonly connection: ChromeTabConnection) {}
 
   get tabId() {
@@ -80,6 +83,7 @@ export class ChromeTabConnection implements TabAttachment {
     this.cdp = new ChromeCdpPort(this);
     this.topology = new PuppeteerFrameTopology(puppeteer.page, this.cdp);
     this.page = new PuppeteerPagePort(puppeteer.page, this.cdp);
+    if (browserMajor() < 125) legacyChannel(tabId).on((sessionId, method, params) => this.dispatch(sessionId, method, params));
   }
 
   static async open(tabId: number): Promise<ChromeTabConnection> {

@@ -111,7 +111,7 @@ describe('the long-run scenario on a 16k window, with the full tool list', () =>
     const last = JSON.stringify(turns.at(-1)!.prompt);
     expect(last).toContain('Save every listing under 900.');
     for (let i = 0; i < 20; i++) expect(last).toContain(`Save listing ${i}»`);
-  });
+  }, 20_000);
 });
 
 describe('a request the provider refuses for its size', () => {

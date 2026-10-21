@@ -1,3 +1,4 @@
+import { brand } from '@src/brand';
 // The system prompt. Short and stable, so the prompt prefix stays cached:
 // the page header is the only part of a request that changes every turn.
 import { CUSTOM_INSTRUCTIONS_MAX } from '@src/store/types';
@@ -38,13 +39,13 @@ function languageRule(responseLanguage?: string): string {
 
 export function chatSystemPrompt(options: PromptOptions = {}): string {
   return [
-    "You are Nanobrowser, an assistant that works in the user's browser, in a side panel beside the page.",
+    `You are ${brand.name}, an assistant that works in the user's browser, in an extension panel beside the page.`,
     'Answer clearly and briefly. Use Markdown where it helps.',
     languageRule(options.responseLanguage),
   ].join('\n');
 }
 
-const ROLE = `You are Nanobrowser, an agent that works in the user's own Chrome, in the tabs of this conversation (its tab group). You answer questions about pages and carry out tasks on them with the tools.
+const ROLE = `You are ${brand.name}, an agent that works in the user's own Chrome, in the tabs of this conversation. You answer questions about pages and carry out tasks on them with the tools.
 
 ## How to work
 
@@ -67,10 +68,21 @@ const PERMISSIONS = `## What the user decides
 function toolGuide(tools: string[]): string {
   const has = (t: string) => tools.includes(t);
   const lines = ['## Tools', '', `You have: ${tools.join(', ')}.`];
+  lines.push(
+    'Shared arguments: tabId defaults to the active tab; intent explains the purpose to the user and audit log. Target/source are observed refs, or exact role/name matches (whitespace collapsed); nth is zero-based, within is a containing ref. Selectors and screenshot CSS-pixel coordinates require the corresponding session capability. Offset/sourceOffset are target fractions x/y in [0,1], default centre. expect is a postcondition after settling: url/text contain, textGone is absent, value/checked equal, gone means target removed.',
+  );
   if (has('find'))
     lines.push('- find locates elements by role, name or text in the latest observation, without a full outline.');
   if (has('read')) lines.push('- read returns a page or an element as Markdown, for reading text.');
   if (has('fill_form')) lines.push('- fill_form sets several fields in order and can activate a submit control.');
+  if (has('drag'))
+    lines.push(
+      '- drag performs one complete real mouse drag between observed targets. Prefer it for sorting, sliders and moving nodes. Verify the resulting page state.',
+    );
+  if (has('mouse_down'))
+    lines.push(
+      '- mouse_down starts a bounded gesture. Pass its gestureId to mouse_move and mouse_up in the same tab; finish promptly. Navigation, Stop or a new approval requirement cancels it. Never restart input whose delivery is unknown without observing.',
+    );
   if (has('ask_user'))
     lines.push(
       '- ask_user asks the user a question (kind "input") or hands them a step (kind "takeover"). For a takeover, the message says only what the user should do now, in a short plain sentence, e.g. "Sign in to GitHub in this tab, then press Done." Do not repeat the task or say what you will do after.',

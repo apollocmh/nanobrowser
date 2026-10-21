@@ -37,6 +37,15 @@ export interface TranscribeOptions {
 }
 
 /**
+ * The providers' official endpoints. The extension has no process environment, so these are pinned: a variable such
+ * as OPENAI_BASE_URL must never redirect a user's key from a path that does not configure it.
+ */
+const OFFICIAL_BASE_URLS = {
+  openai: 'https://api.openai.com/v1',
+  google: 'https://generativelanguage.googleapis.com/v1beta',
+} as const;
+
+/**
  * A hint in the script wanted: OpenAI's language parameter is ISO 639-1, so `zh` alone does not say Simplified or
  * Traditional, and a short prompt in that script steers the output.
  */
@@ -88,11 +97,16 @@ export async function transcribeAudio(
   options: TranscribeOptions = {},
 ): Promise<string> {
   const { kind, modelName, apiKey } = spec;
-  const baseURL = spec.baseUrl?.trim() ? { baseURL: spec.baseUrl.trim() } : {};
+  const baseURL = spec.baseUrl?.trim();
   let model;
-  if (kind === 'openai') model = createOpenAI({ apiKey, ...baseURL, fetch: options.fetch }).transcription(modelName);
+  if (kind === 'openai')
+    model = createOpenAI({ apiKey, baseURL: baseURL || OFFICIAL_BASE_URLS.openai, fetch: options.fetch }).transcription(
+      modelName,
+    );
   else if (kind === 'gemini')
-    model = createGoogle({ apiKey, ...baseURL, fetch: options.fetch }).transcription(modelName);
+    model = createGoogle({ apiKey, baseURL: baseURL || OFFICIAL_BASE_URLS.google, fetch: options.fetch }).transcription(
+      modelName,
+    );
   else throw new Error(`${kind} has no voice models`);
   try {
     const result = await transcribe({

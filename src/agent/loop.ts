@@ -152,7 +152,7 @@ export function stopsBatch(call: ToolCallRequest, outcome: CallOutcome): boolean
   if (receipt?.allowedBy === 'user' || receipt?.confirmedByUser) return true;
   if (
     receipt &&
-    ['click', 'set', 'type', 'press', 'fill_form'].includes(call.toolName) &&
+    ['click', 'set', 'type', 'press', 'fill_form', 'drag', 'mouse_up'].includes(call.toolName) &&
     receipt.effect.verdict === 'none' &&
     receipt.postcondition?.status !== 'met'
   ) {

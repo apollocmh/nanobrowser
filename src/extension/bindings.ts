@@ -5,6 +5,7 @@ import { siteOf } from '@src/browser-control';
 import type { RunStatus } from '@src/store/types';
 import type { ScopeTab } from '@src/ui/protocol';
 import { PANEL_PATH } from './panel';
+import { brand } from '@src/brand';
 
 const KEY = 'nb.scope';
 
@@ -161,7 +162,7 @@ export class TabScope {
     await save();
     if (options.ungroup !== false) {
       this.#grouping.add(tabId);
-      await chrome.tabs.ungroup(tabId).catch(() => undefined);
+      if (chrome.tabs.ungroup) await chrome.tabs.ungroup(tabId).catch(() => undefined);
       this.#grouping.delete(tabId);
     }
     if (!options.keepPanel) await chrome.sidePanel.setOptions({ tabId, enabled: false }).catch(() => undefined);
@@ -210,7 +211,7 @@ export class TabScope {
       await chrome.tabGroups
         .update(group.groupId, {
           color: colorOf(conversationId),
-          title: `${PREFIX[status] ?? ''}Nanobrowser · ${short || 'chat'}`,
+          title: `${PREFIX[status] ?? ''}${brand.name} · ${short || 'chat'}`,
         })
         .catch(() => undefined);
     }
@@ -247,6 +248,8 @@ export class TabScope {
   }
 
   async #group(conversationId: string, tab: chrome.tabs.Tab): Promise<void> {
+    // Chrome 80 still shows the complete scope in the panel; native groups did not exist yet.
+    if (!chrome.tabs.group) return;
     const state = await load();
     const group = state.groups[conversationId];
     this.#grouping.add(tab.id!);
@@ -264,7 +267,7 @@ export class TabScope {
         // Without the tabGroups permission the group keeps no title and Chrome's default colour.
         if (chrome.tabGroups) {
           await chrome.tabGroups
-            .update(groupId, { color: colorOf(conversationId), title: 'Nanobrowser' })
+            .update(groupId, { color: colorOf(conversationId), title: brand.name })
             .catch(() => undefined);
         }
         state.groups[conversationId] = { groupId, windowId: tab.windowId };

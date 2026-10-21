@@ -4,6 +4,7 @@
 // reaches the voice model as WAV and its text lands in the message box. The microphone page renders. Speaking in two
 // languages to a real voice model is checked by hand.
 import { defineCheck } from './registry';
+import { brand } from '@src/brand';
 import { sleep, waitForLoad } from './helpers';
 import { FIXTURE_PROVIDER, openPanelTab, panel, seedFixtureModel } from './panel-chat';
 
@@ -113,7 +114,7 @@ defineCheck({
     await waitForLoad(mic.id!);
     await sleep(600);
     const [title] = await chrome.tabs.query({ active: true, currentWindow: true });
-    report.micPage = title?.title === 'Microphone for Nanobrowser';
+    report.micPage = title?.title === `Microphone for ${brand.name}`;
     await chrome.tabs.remove(mic.id!);
 
     await chrome.storage.local.set({

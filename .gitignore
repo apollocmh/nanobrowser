@@ -1,5 +1,6 @@
 node_modules
 dist
+dist-mv2
 dist-zip
 .output
 .wxt
@@ -14,3 +15,4 @@ coverage
 .nanobrowser
 # Measurement runs write raw data here
 fixtures/.results
+/.claude/settings.json

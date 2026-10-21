@@ -462,5 +462,14 @@
   "models.noReasoning": "does not reason",
   "notice.reasoningDropped": "This model did not take the reasoning setting; continuing without it.",
   "notice.imagesDropped": "This model did not take images; continuing without them.",
-  "notice.stopped": "Stopped · What should Nanobrowser do instead?"
+  "notice.stopped": "Stopped · What should Nanobrowser do instead?",
+  "general.virtualMouse": "Show AI mouse",
+  "general.virtualMouseHint": "Show real mouse movement, clicks and dragging on the page.",
+  "act.mouseDown": "Pressed the mouse on {target}",
+  "act.mouseMove": "Moved the mouse to {target}",
+  "act.mouseUp": "Released the mouse on {target}",
+  "act.drag": "Dragged {target}",
+  "welcome.legacy.title": "Open Nanobrowser from the toolbar",
+  "welcome.legacy.body": "Click the extension icon to open its chat window. You can also use Alt+Shift+N or configure the shortcut in the browser's extension settings.",
+  "privacy.disabled": "Anonymous usage reporting is disabled in this internal build."
 }

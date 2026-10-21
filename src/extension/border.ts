@@ -3,6 +3,7 @@
 // see (on <html>, no pointer events, hidden from accessibility, its content in a closed shadow root). The border goes
 // away when the run stops working, fades out for the model's screenshots, and can be turned off in Settings.
 import { settingsStorage } from '@src/store/settings';
+import { subscribeScreenshotDecorations } from '@src/browser-control';
 import type { RunStatus } from '@src/store/types';
 
 export type BorderState = 'on' | 'hidden' | 'off';
@@ -20,7 +21,7 @@ export interface BorderPorts {
   inject(tabId: number, state: BorderState, documentId?: string): Promise<void>;
 }
 
-/** How long a screenshot waits for the border to fade out; past it, the capture goes ahead. */
+/** A capture fails closed if the border cannot be hidden within this budget. */
 export const HIDE_WAIT_MS = 300;
 
 export class PageBorder {
@@ -67,14 +68,35 @@ export class PageBorder {
    * at once while the first is still fading.
    */
   async around<T>(tabId: number, capture: () => Promise<T>): Promise<T> {
-    if (!(await this.#wanted(tabId))) return capture();
+    const restore = await this.hide(tabId);
+    try {
+      return await capture();
+    } finally {
+      await restore();
+    }
+  }
+
+  /** Also registered on the raw screenshot channel so internal captures hide the border. */
+  async hide(tabId: number): Promise<() => Promise<void>> {
+    if (!(await this.#wanted(tabId))) return async () => undefined;
     const count = this.#capturing.get(tabId) ?? 0;
     this.#capturing.set(tabId, count + 1);
     if (!count) this.#hiding.set(tabId, this.#hide(tabId));
     try {
       await this.#hiding.get(tabId);
-      return await capture();
-    } finally {
+    } catch (error) {
+      const left = (this.#capturing.get(tabId) ?? 1) - 1;
+      if (left) this.#capturing.set(tabId, left);
+      else {
+        this.#capturing.delete(tabId);
+        this.#hiding.delete(tabId);
+      }
+      throw error;
+    }
+    let restored = false;
+    return async () => {
+      if (restored) return;
+      restored = true;
       const left = (this.#capturing.get(tabId) ?? 1) - 1;
       if (left > 0) this.#capturing.set(tabId, left);
       else {
@@ -82,16 +104,25 @@ export class PageBorder {
         this.#hiding.delete(tabId);
         void this.#apply(tabId);
       }
-    }
+    };
   }
 
   async #hide(tabId: number): Promise<void> {
     let timer: ReturnType<typeof setTimeout> | undefined;
-    await Promise.race([
-      this.ports.inject(tabId, 'hidden').catch(() => undefined),
-      new Promise<void>(resolve => (timer = setTimeout(resolve, HIDE_WAIT_MS))),
-    ]);
-    clearTimeout(timer);
+    try {
+      await Promise.race([
+        this.ports.inject(tabId, 'hidden'),
+        new Promise<never>(
+          (_, reject) =>
+            (timer = setTimeout(
+              () => reject(new Error('Page border could not be hidden before screenshot')),
+              HIDE_WAIT_MS,
+            )),
+        ),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async #wanted(tabId: number): Promise<boolean> {
@@ -135,14 +166,18 @@ export function setBorder(state: BorderState): Promise<void> | void {
     host.setAttribute('aria-hidden', 'true');
     host.setAttribute('data-nanobrowser-border', '');
     host.style.cssText =
-      'all:initial;position:fixed;inset:0;pointer-events:none;z-index:2147483647;display:block;contain:strict';
+      'all:initial;position:fixed;top:0;right:0;bottom:0;left:0;pointer-events:none;z-index:2147483647;display:block;contain:strict';
+    for (let i = 0; i < host.style.length; i++) {
+      const name = host.style.item(i);
+      host.style.setProperty(name, host.style.getPropertyValue(name), 'important');
+    }
     const root = host.attachShadow({ mode: 'closed' });
-    const blue = 'rgb(0 115 220 / 0.6)';
-    const violet = 'rgb(124 92 255 / 0.6)';
+    const blue = 'rgba(0, 115, 220, 0.6)';
+    const violet = 'rgba(124, 92, 255, 0.6)';
     const along = (side: string) => `linear-gradient(${side}, ${violet}, ${blue} 25%, ${blue} 75%, ${violet})`;
     root.innerHTML = `<style>
-      .glow { position: absolute; inset: 0; transition: opacity 150ms ease; }
-      .pulse { position: absolute; inset: 0; animation: breathe 2s ease-in-out infinite alternate; }
+      .glow { position: absolute; top: 0; right: 0; bottom: 0; left: 0; transition: opacity 150ms ease; }
+      .pulse { position: absolute; top: 0; right: 0; bottom: 0; left: 0; animation: breathe 2s ease-in-out infinite alternate; }
       @keyframes breathe { from { opacity: 0.6; } to { opacity: 1; } }
       @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
       .edge { position: absolute; }
@@ -203,6 +238,7 @@ export async function injectBorder(tabId: number, state: BorderState, documentId
 
 /** New documents in a tab's top frame, and the Settings switch. Registered at worker start. */
 export function listenForBorder(border: PageBorder): void {
+  subscribeScreenshotDecorations(tabId => border.hide(tabId));
   chrome.webNavigation.onCommitted.addListener(details => {
     if (details.frameId === 0) void border.committed(details.tabId, details.documentId).catch(() => undefined);
   });

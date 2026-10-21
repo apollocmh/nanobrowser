@@ -1,7 +1,6 @@
 // The page border: while a run works, its page has the border, and no other tab does; it goes when the run is done;
 // the model's screenshot shows the page without it; a new document gets it; a page restored with Back after Stop has
 // none; the Settings switch takes it away and brings it back.
-import { sendRaw } from '@src/browser-control';
 import { FIXTURE_ORIGIN } from '../fixtures-config';
 import { defineCheck } from './registry';
 import { sleep, waitForLoad } from './helpers';
@@ -96,7 +95,9 @@ defineCheck({
       report.shownWhileWorking = await until(() => hasBorder(id), true);
       report.notOnOtherTab = !(await hasBorder(other.id!));
       await sleep(400);
-      const { data } = await sendRaw<{ data: string }>(id, undefined, 'Page.captureScreenshot', { format: 'png' });
+      // The human-visible control image deliberately bypasses the agent's screenshot channel.
+      await chrome.tabs.update(id, { active: true });
+      const data = (await chrome.tabs.captureVisibleTab(page.windowId, { format: 'png' })).split(',')[1];
       const withBorder = await edgeBlue(data);
       report.controlShowsBorder = withBorder > 30;
       report.image = `data:image/png;base64,${data}`;

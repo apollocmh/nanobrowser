@@ -1,5 +1,6 @@
 // The product's wiring in the service worker. Listener registration stays synchronous at worker start.
 import './panel';
+import { listenForCursor } from './cursor';
 import { addFirstShortcuts } from './first-run';
 import { listenForPanels } from './panel-port';
 import { RunManager } from './run-manager';
@@ -12,6 +13,7 @@ import { WHATS_NEW, releaseOf } from '@src/ui/whats-new';
 import { DATA_REQUEST } from '@src/ui/protocol';
 
 export const runManager = new RunManager();
+listenForCursor();
 listenForPanels(runManager);
 listenForSelections(runManager);
 // The watchdog alarm only wakes the worker; starting it is what restores an unfinished run.

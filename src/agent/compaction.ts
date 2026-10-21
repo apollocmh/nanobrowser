@@ -12,6 +12,7 @@ import { NOTE_LABEL, note } from './records';
 import { CONTRACT } from './prompt';
 import { learnFrom, turnEffort } from './run';
 import type { ResolvedModel } from './run';
+import { hardLimit } from './elision';
 
 type MessageEntry = EntryOf<'message'>;
 
@@ -431,6 +432,22 @@ export interface CompactionResult {
   notices: Array<{ id: string; text: string; tone: 'info' | 'warn'; at: string }>;
 }
 
+/** Leave room for the fixed tool prefix, complete user/answer exchanges, the ledger and working notes. */
+function recentBudget(entries: MessageEntry[], model: ResolvedModel, window: number, fixedChars: number): number {
+  const protectedChars = unitsOf(entries).reduce(
+    (size, unit) =>
+      size + (unit.kind === 'user' ? unit.chars : askExchanges(unit).reduce((n, entry) => n + entryChars(entry), 0)),
+    0,
+  );
+  const inputChars = (hardLimit(model.profile, window) * 4) / (model.profile.countFactor ?? 1);
+  const ledgerReserve = window * 4 * 0.1;
+  const summaryReserve = Math.min(2_000, window / 8) * 4;
+  return Math.min(
+    window * 4 * 0.3,
+    Math.max(0, inputChars - fixedChars - protectedChars - ledgerReserve - summaryReserve),
+  );
+}
+
 /** Thousands, as the notice shows them: 41k. */
 function k(tokens: number): string {
   return tokens >= 1000 ? `${Math.round(tokens / 1000)}k` : String(Math.round(tokens));
@@ -458,7 +475,7 @@ export async function runCompaction(options: {
   const branch = await activeBranch(conversationId);
   const entries = groupResults(messageEntries(branch));
   const previous = latestCompaction(branch);
-  const plan = planCompaction(entries, window * 4 * 0.3, previous);
+  const plan = planCompaction(entries, recentBudget(entries, model, window, options.fixedChars), previous);
   if (!plan) return null;
   const tokensBefore = (options.fixedChars + contextChars(options.messages(branch))) / 4;
   const lines = [

@@ -9,7 +9,7 @@ import tailwindcss from 'eslint-plugin-tailwindcss';
 
 export default [
   {
-    ignores: ['dist/**', '.wxt/**', '.output/**', 'fixtures/**', '**/*.{js,mjs,cjs,jsx,mts,cts}'],
+    ignores: ['dist/**', 'dist-mv2/**', 'dist-zip/**', '.wxt/**', '.output/**', 'fixtures/**', '**/*.{js,mjs,cjs,jsx,mts,cts}'],
   },
   js.configs.recommended,
   react.configs.flat.recommended,

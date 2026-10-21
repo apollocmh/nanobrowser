@@ -13,7 +13,7 @@ const BLOCK_MS = 4_000;
  */
 export async function sendWithheld(
   tab: TabState,
-  kind: 'pointer' | 'text',
+  kind: 'pointer' | 'text' | 'all',
   send: () => Promise<unknown>,
 ): Promise<boolean> {
   const { attachment, probe } = tab;

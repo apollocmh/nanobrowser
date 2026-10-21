@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" />
+  <title>Native gestures in a frame</title>
+  <style>
+    body { margin: 8px; font: 16px Arial, sans-serif; }
+    .box { display: inline-block; padding: 20px; margin-right: 12px; background: #dfe8f8; user-select: none; }
+  </style>
+  <div id="frame-source" class="box" role="button" aria-label="Frame native source" draggable="true">Frame source</div>
+  <div id="frame-destination" class="box" role="button" aria-label="Frame native destination">Frame destination</div>
+  <output id="status">0</output>
+  <script>
+    (function () {
+      var state = window.gestureFixture = { nativeDrops: 0, events: [] };
+      if (location.search.indexOf('cross=1') !== -1) {
+        document.getElementById('frame-source').setAttribute('aria-label', 'Cross native source');
+        document.getElementById('frame-destination').setAttribute('aria-label', 'Cross native destination');
+      }
+      ['dragstart', 'dragover', 'drop', 'dragend'].forEach(function (type) {
+        document.addEventListener(type, function (event) {
+          state.events.push({ type: type, trusted: event.isTrusted });
+        }, true);
+      });
+      document.getElementById('frame-source').addEventListener('dragstart', function (event) {
+        event.dataTransfer.setData('text/plain', 'frame-source');
+      });
+      var destination = document.getElementById('frame-destination');
+      destination.addEventListener('dragover', function (event) { event.preventDefault(); });
+      destination.addEventListener('drop', function (event) {
+        event.preventDefault();
+        var data = event.dataTransfer.getData('text/plain');
+        if (event.isTrusted && (data === 'frame-source' || data === 'fixture-source')) {
+          state.nativeDrops++;
+          document.getElementById('status').textContent = String(state.nativeDrops);
+        }
+      });
+    })();
+  </script>
+</html>

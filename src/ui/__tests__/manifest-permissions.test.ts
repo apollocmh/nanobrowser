@@ -7,6 +7,18 @@ import { OPTIONAL_PERMISSIONS, permissionLists } from '../manifest-permissions';
 const FOUR = ['tabGroups', 'notifications', 'downloads', 'downloads.open'];
 
 describe('manifest permission lists', () => {
+  it('MV2 declares hosts in permissions and excludes APIs introduced after Chrome 80', () => {
+    const product = permissionLists('product', true);
+    expect(product.permissions).toContain('<all_urls>');
+    for (const p of ['sidePanel', 'offscreen', 'scripting', 'tabGroups']) {
+      expect(product.permissions).not.toContain(p);
+      expect(product.optional_permissions).not.toContain(p);
+    }
+    expect(product.optional_permissions).toEqual(['notifications', 'downloads', 'downloads.open']);
+    const autorun = permissionLists('autorun', true);
+    expect(autorun.permissions).toContain('downloads');
+    expect(autorun.optional_permissions).toEqual([]);
+  });
   it('the product makes the four optional and requires none of them', () => {
     const product = permissionLists('product');
     expect([...OPTIONAL_PERMISSIONS].sort()).toEqual([...FOUR].sort());

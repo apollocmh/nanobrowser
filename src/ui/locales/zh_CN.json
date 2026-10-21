@@ -462,5 +462,14 @@
   "models.noReasoning": "不推理",
   "notice.reasoningDropped": "此模型不接受推理设置；将不使用该设置继续。",
   "notice.imagesDropped": "此模型不接受图片；将不使用图片继续。",
-  "notice.stopped": "已停止 · 接下来要 Nanobrowser 做什么？"
+  "notice.stopped": "已停止 · 接下来要 Nanobrowser 做什么？",
+  "general.virtualMouse": "显示 AI 鼠标",
+  "general.virtualMouseHint": "在网页上显示真实的鼠标移动、点击反馈和拖拽过程。",
+  "act.mouseDown": "在 {target} 按下鼠标",
+  "act.mouseMove": "移动鼠标至 {target}",
+  "act.mouseUp": "在 {target} 释放鼠标",
+  "act.drag": "拖拽 {target}",
+  "welcome.legacy.title": "从工具栏打开 Nanobrowser",
+  "welcome.legacy.body": "点击扩展图标打开聊天窗口，也可以使用 Alt+Shift+N，或在浏览器的扩展快捷键设置中配置。",
+  "privacy.disabled": "此内部版本已关闭匿名使用统计外发。"
 }

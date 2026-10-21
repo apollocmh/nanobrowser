@@ -22,6 +22,10 @@ async function ensureOffscreen(): Promise<void> {
 
 async function revoke(url: string): Promise<void> {
   if (!held.delete(url)) return;
+  if (chrome.runtime.getManifest().manifest_version === 2) {
+    URL.revokeObjectURL(url);
+    return;
+  }
   const answer = (await chrome.runtime.sendMessage({ target: 'offscreen', type: 'revoke', url }).catch(() => null)) as {
     held?: number;
   } | null;
@@ -30,6 +34,12 @@ async function revoke(url: string): Promise<void> {
 
 /** A blob URL for the content, made in the offscreen document. */
 export async function blobUrl(content: string, mimeType: string): Promise<string> {
+  if (chrome.runtime.getManifest().manifest_version === 2) {
+    const url = URL.createObjectURL(new Blob([content], { type: mimeType }));
+    held.add(url);
+    setTimeout(() => void revoke(url), 10 * 60_000);
+    return url;
+  }
   await ensureOffscreen();
   const answer = (await chrome.runtime.sendMessage({ target: 'offscreen', type: 'blob-url', content, mimeType })) as {
     url: string;

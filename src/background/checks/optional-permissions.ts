@@ -35,11 +35,12 @@ defineCheck({
     // This build's manifest with the product's lists. The name and description are plain text, since Chrome reads
     // the manifest without the extension's _locales.
     const own = chrome.runtime.getManifest() as unknown as Record<string, unknown>;
+    const legacy = own.manifest_version === 2;
     const product: Record<string, unknown> = {
       ...own,
       name: 'Nanobrowser',
       description: 'Nanobrowser',
-      ...permissionLists('product'),
+      ...permissionLists('product', legacy),
     };
     delete product.default_locale;
     delete product.key;
@@ -47,7 +48,9 @@ defineCheck({
     const after = await warnings(product);
     const added = after.filter(w => !before.includes(w));
     // A control: with the four required, as in the autorun build, Chrome must report new warnings, or the check is blind.
-    const control = (await warnings({ ...product, ...permissionLists('autorun') })).filter(w => !before.includes(w));
+    const control = (await warnings({ ...product, ...permissionLists('autorun', legacy) })).filter(
+      w => !before.includes(w),
+    );
     if (!control.length) throw new Error('the four optional permissions give no new warning when required');
     const report = {
       old: before,

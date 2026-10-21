@@ -113,17 +113,18 @@ describe('PageBorder', () => {
     expect(sent).toEqual([]);
   });
 
-  it('captures anyway when the border does not hide in time', async () => {
+  it('fails closed when the border does not hide in time', async () => {
     vi.useFakeTimers();
     const { border } = setup({ hide: () => new Promise(() => undefined) });
     await border.status('a', 'running');
     let captured = false;
     const done = border.around(1, async () => (captured = true));
+    const rejected = expect(done).rejects.toThrow('Page border could not be hidden');
     await vi.advanceTimersByTimeAsync(HIDE_WAIT_MS - 10);
     expect(captured).toBe(false);
     await vi.advanceTimersByTimeAsync(20);
-    await done;
-    expect(captured).toBe(true);
+    await rejected;
+    expect(captured).toBe(false);
   });
 
   it('screenshots of one tab that overlap share one fade', async () => {

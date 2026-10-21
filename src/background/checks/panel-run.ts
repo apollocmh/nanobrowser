@@ -2,6 +2,7 @@
 // gives queued messages back to the composer; there is no Take over, and a message after Stop carries the task on;
 // Continue after the turn cap.
 import { getRun } from '@src/store/conversations';
+import { brand } from '@src/brand';
 import { FIXTURE_ORIGIN } from '../fixtures-config';
 import { defineCheck } from './registry';
 import { sleep, waitForLoad } from './helpers';
@@ -94,7 +95,7 @@ defineCheck({
       await until(status, s => s === 'Stopped', 'stopped');
       report.historyOpenAfterStop = !(await panel(id, 'read')).disabled?.includes('History');
       // Stop says so in the transcript, and the next run's model is told the last one was stopped.
-      report.stopNotice = (await panel(id, 'read')).body.includes('What should Nanobrowser do instead?');
+      report.stopNotice = (await panel(id, 'read')).body.includes(`What should ${brand.name} do instead?`);
       await panel(id, 'type-send', { text: 'Carry on' });
       await waitForText(id, 'Carried on after Stop.');
       const afterStop = (await (await fetch('http://localhost:8787/__llm/requests')).json()) as unknown[];

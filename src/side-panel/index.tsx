@@ -1,3 +1,4 @@
+import '@src/compat/bootstrap';
 import { createRoot } from 'react-dom/client';
 import '@src/ui/index.css';
 import { watchSystemTheme } from '@src/ui/theme';

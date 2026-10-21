@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { brand } from '@src/brand';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createModel, openAICompatibleBaseUrl } from '../providers';
 import type { ModelSpec } from '../providers';
 import { streamTurn } from '../stream';
@@ -8,6 +9,13 @@ interface Captured {
   headers: Headers;
   body: Record<string, unknown>;
 }
+
+// Host CLI provider configuration must not redirect these deterministic browser request tests.
+beforeEach(() => {
+  for (const name of ['ANTHROPIC_BASE_URL', 'OPENAI_BASE_URL', 'GOOGLE_GENERATIVE_AI_BASE_URL'])
+    vi.stubEnv(name, undefined);
+});
+afterEach(() => vi.unstubAllEnvs());
 
 /** A fetch that records the request and answers 400, so nothing is retried. */
 function captureFetch() {
@@ -123,7 +131,7 @@ describe('providers', () => {
   it('OpenRouter sends its headers', async () => {
     const r = await capture({ kind: 'openrouter', modelName: 'anthropic/claude-sonnet-5.5', apiKey: 'or' });
     expect(r.url).toBe('https://openrouter.ai/api/v1/chat/completions');
-    expect(r.headers.get('x-title')).toBe('Nanobrowser');
+    expect(r.headers.get('x-title')).toBe(brand.providerTitle);
   });
 });
 

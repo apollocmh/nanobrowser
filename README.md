@@ -1,3 +1,5 @@
+> 知安大模型（内部改造版本）：支持 Chromium 80 的 MV2 包与 Chrome 125+ 的 MV3 包，品牌由 `src/brand.ts` 配置。构建、部署、真实验证结果及旧版原生 HTML5 拖放限制见 [内部兼容说明](docs/CHROMIUM80.md)。下方保留上游项目介绍与署名。
+
 <h1 align="center">
     <img src="https://github.com/user-attachments/assets/294f9cdc-38ba-4cdc-beff-82fe78c9a023" width="100%" alt="Nanobrowser" /><br>
 </h1>

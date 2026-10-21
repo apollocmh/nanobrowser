@@ -1,3 +1,4 @@
+import '@src/compat/bootstrap';
 // The first run: the welcome page, opened when the extension is installed. Three steps: what Nanobrowser does with a
 // coach mark for Chrome's pin button; choosing a model (local or cloud, or Set it later); and three tips for safe use,
 // with a row that allows the browser features.
@@ -100,6 +101,8 @@ export function Welcome() {
 function usePinned(): boolean | null {
   const [pinned, setPinned] = useState<boolean | null>(null);
   useEffect(() => {
+    // Chromium 80 cannot read the toolbar pin state. Keep the state unknown and show its real opening paths.
+    if (typeof chrome.action.getUserSettings !== 'function') return;
     const check = () =>
       void chrome.action
         .getUserSettings()
@@ -153,8 +156,14 @@ function WelcomeStep() {
             ↗
           </span>
           <span className="flex flex-col gap-0.5">
-            <span className="font-semibold">{t('welcome.pin.title')}</span>
-            <span>{withIcons(t('welcome.pin.body'), PIN_ICONS)}</span>
+            <span className="font-semibold">
+              {t(typeof chrome.action.getUserSettings === 'function' ? 'welcome.pin.title' : 'welcome.legacy.title')}
+            </span>
+            <span>
+              {typeof chrome.action.getUserSettings === 'function'
+                ? withIcons(t('welcome.pin.body'), PIN_ICONS)
+                : t('welcome.legacy.body')}
+            </span>
           </span>
         </div>
       )}

@@ -1,3 +1,4 @@
+import { brand } from '@src/brand';
 // Line icons for the panel and the settings page: 24-unit strokes in the text colour, hidden from assistive
 // technology (the button around each one carries the label). Drawn for this project.
 import type { ReactNode, SVGProps } from 'react';
@@ -214,18 +215,23 @@ export const SlantedPinIcon = (p: IconProps) => (
 );
 
 export function LogoMark({ size = 20, className = '' }: { size?: number; className?: string }) {
-  return <img src="/icon-128.png" alt="" width={size} height={size} className={`shrink-0 ${className}`} />;
+  return <img src={`/${brand.icon}`} alt="" width={size} height={size} className={`shrink-0 ${className}`} />;
 }
 
 /** The brand's horizontal logo: the mark and "Nanobrowser". */
 export function Logo({ height = 28, className = '' }: { height?: number; className?: string }) {
-  return (
+  return brand.logo ? (
     <img
-      src="/brand/logo-horizontal.png"
-      alt="Nanobrowser"
+      src={`/${brand.logo}`}
+      alt={brand.name}
       height={height}
       style={{ height, width: 'auto' }}
       className={className}
     />
+  ) : (
+    <span className={`inline-flex items-center font-semibold ${className}`} style={{ gap: 8, fontSize: height * 0.62 }}>
+      <LogoMark size={height} />
+      {brand.name}
+    </span>
   );
 }

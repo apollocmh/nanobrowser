@@ -31,6 +31,11 @@ export function roleOf(node: AXNode): string {
   return typeof node.role?.value === 'string' ? node.role.value : '';
 }
 
+/** Chromium 80 calls document roots `webArea`; newer releases use RootWebArea. Keep other raw roles untouched. */
+export function isDocumentRole(role: string): boolean {
+  return role === 'RootWebArea' || role === 'WebArea' || role === 'webArea';
+}
+
 export function nameOf(node: AXNode): string {
   return typeof node.name?.value === 'string' ? node.name.value : '';
 }

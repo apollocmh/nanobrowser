@@ -4,7 +4,7 @@
 // masks sensitive values, and states every omission.
 import type { SessionId } from '../ports';
 import type { AXNode } from './ax';
-import { cleanText, nameOf, property, roleOf, valueOf } from './ax';
+import { cleanText, isDocumentRole, nameOf, property, roleOf, valueOf } from './ax';
 import type { Capture, FieldFacts, FrameCapture } from './capture';
 import { isSensitiveField, isSensitiveLabel, MASK } from './masking';
 import { decodeSnapshot } from './layout';
@@ -39,6 +39,7 @@ export const INTERACTIVE_ROLES = new Set([
 const NOT_ACTIONABLE_WHEN_FOCUSABLE = new Set([
   'RootWebArea',
   'WebArea',
+  'webArea',
   'document',
   'dialog',
   'alertdialog',
@@ -132,6 +133,8 @@ const DISPLAY_ROLES: Record<string, string> = {
   MenuListPopup: 'listbox',
   MenuListOption: 'option',
   RootWebArea: 'document',
+  WebArea: 'document',
+  webArea: 'document',
   StaticText: 'text',
   LabelText: 'label',
 };
@@ -191,7 +194,7 @@ function statesOf(node: AXNode, raw: string): string[] {
   if (invalid !== undefined && invalid !== 'false' && invalid !== false) states.push('invalid');
   if (property(node, 'modal') === true) states.push('modal');
   if (property(node, 'busy') === true) states.push('busy');
-  if (property(node, 'focused') === true && raw !== 'RootWebArea') states.push('focused');
+  if (property(node, 'focused') === true && !isDocumentRole(raw)) states.push('focused');
   return states;
 }
 
@@ -308,7 +311,7 @@ export function buildFrameTree(frame: FrameCapture, stats: TreeStats = { deepCut
     }
     const name = cleanText(nameOf(node));
     const actionable = isActionable(node, raw, name);
-    if (raw === 'RootWebArea') return kids();
+    if (isDocumentRole(raw)) return kids();
     if (raw === 'paragraph') {
       // A paragraph prints as one text line, unless it holds something actionable such as a link.
       const children = kids();

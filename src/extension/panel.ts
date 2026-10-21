@@ -17,8 +17,16 @@ chrome.action.onClicked.addListener(tab => {
 });
 
 chrome.commands.onCommand.addListener((command, tab) => {
-  if (tab?.id === undefined) return;
-  if (command === 'open-panel') openPanel(tab.id);
-  // The layer's test panel is a developer tool; it has no button.
-  if (command === 'open-test-panel') openPanel(tab.id, TEST_PANEL_PATH);
+  const open = (tabId: number) => {
+    if (command === 'open-panel') openPanel(tabId);
+    // The layer's test panel is a developer tool; it has no button.
+    if (command === 'open-test-panel') openPanel(tabId, TEST_PANEL_PATH);
+  };
+  if (tab?.id !== undefined) return open(tab.id);
+  // Older commands events provide only the command name. MV2 companion windows need no native side-panel gesture.
+  if (chrome.runtime.getManifest().manifest_version === 2) {
+    void chrome.tabs.query({ active: true, lastFocusedWindow: true }).then(([active]) => {
+      if (active?.id !== undefined) open(active.id);
+    });
+  }
 });

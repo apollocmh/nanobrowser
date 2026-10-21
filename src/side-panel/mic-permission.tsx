@@ -1,3 +1,4 @@
+import '@src/compat/bootstrap';
 // The microphone page: a side panel cannot show the microphone prompt, so the first press of the microphone button
 // opens this page, which asks with getUserMedia and closes once access is given. The panel tries again when it closes.
 // Ported from the current Nanobrowser's permission page.

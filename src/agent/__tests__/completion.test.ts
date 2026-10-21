@@ -66,6 +66,9 @@ describe('what creates and clears debt', () => {
   it.each([
     ['a dispatched click that changed the page', 'click', effect(4), false],
     ['no effect', 'click', noEffect, true],
+    ['a completed drag without an observed effect', 'drag', noEffect, true],
+    ['a staged release without an observed effect', 'mouse_up', noEffect, true],
+    ['a drag with unknown delivery', 'drag', failed('TIMEOUT', 'x', { delivered: 'unknown' }), true],
     [
       'no effect, postcondition met',
       'click',

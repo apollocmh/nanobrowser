@@ -2,5 +2,6 @@
 // count the visits that came from the extension; it carries no identifier.
 
 /** A page of the website (`/docs` is the help pages), tagged with the place that links to it. */
-export const websiteUrl = (path: '/' | '/docs', place: 'side-panel' | 'settings' | 'about') =>
-  `https://nanobrowser.ai${path}?utm_source=nanobrowser-extension&utm_medium=${place}`;
+import { brand } from '@src/brand';
+export const websiteUrl = (path: '/' | '/docs', _place: 'side-panel' | 'settings' | 'about') =>
+  path === '/docs' ? brand.help : brand.website;

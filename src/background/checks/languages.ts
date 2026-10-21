@@ -1,6 +1,7 @@
 // Languages. The interface switches language at runtime, in the panel and the settings page, from the in-app picker;
 // the answer language reaches the system prompt; the strings Chrome shows itself come from the extension's locales.
 import type { DEFAULT_SETTINGS } from '@src/store/settings';
+import { brand } from '@src/brand';
 import { FIXTURE_ORIGIN } from '../fixtures-config';
 import { defineCheck } from './registry';
 import { sleep, waitForLoad } from './helpers';
@@ -59,7 +60,8 @@ defineCheck({
         answerLanguage: system.includes('Answer in Simplified Chinese'),
         promptStaysEnglish: system.includes('## Untrusted content'),
         chromeStrings:
-          chrome.i18n.getMessage('extName') === 'Nanobrowser' && !!chrome.i18n.getMessage('menuAskAboutSelection'),
+          chrome.i18n.getMessage('extName') === brand.name &&
+          chrome.i18n.getMessage('menuAskAboutSelection').includes(brand.name),
         image,
       };
       if (Object.values(report).includes(false)) {

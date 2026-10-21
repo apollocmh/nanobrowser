@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Conversation, Entry, EntryBody } from '@src/store/types';
 import { conversationMarkdown, exportName } from '../export';
 import { attachmentParts } from '../attachments';
+import { brand } from '@src/brand';
 
 let n = 0;
 const e = (body: EntryBody): Entry =>
@@ -49,6 +50,8 @@ describe('export', () => {
     expect(md).toContain('- ✓ set · [a3] textbox «Name» · set-value · dispatched');
     expect(md).toContain('Booked for **Friday at 8pm**.');
     expect(md).toContain('> Saved the file booking.md');
+    expect(md).toContain(`_Exported from ${brand.name} on `);
+    expect(md).toContain(`## ${brand.name} · `);
     expect(md).not.toContain('hunter2');
   });
 

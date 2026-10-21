@@ -1,3 +1,4 @@
+import { brand } from '@src/brand';
 // Settings → About: the version, the project's licence, the website, and the open-source packages the extension ships with theirs.
 import { SettingsCard } from './SettingsCard';
 import { t } from '@src/ui/i18n';
@@ -9,15 +10,17 @@ export function AboutSection() {
   return (
     <div className="flex flex-col gap-6">
       <h2 className="sr-only">{t('settings.nav.about')}</h2>
-      <SettingsCard title="Nanobrowser" className="flex flex-col gap-1">
+      <SettingsCard title={brand.name} className="flex flex-col gap-1">
         <p className="text-sm">{t('about.version', { version: manifest.version })}</p>
         <p className="text-sm text-nb-muted">{t('about.license', { license: 'Apache-2.0' })}</p>
-        <p className="text-sm">
-          {t('about.website')}{' '}
-          <a className="text-nb-link underline" href={websiteUrl('/', 'about')} target="_blank" rel="noreferrer">
-            nanobrowser.ai
-          </a>
-        </p>
+        {brand.website && (
+          <p className="text-sm">
+            {t('about.website')}{' '}
+            <a className="text-nb-link underline" href={websiteUrl('/', 'about')} target="_blank" rel="noreferrer">
+              {brand.name}
+            </a>
+          </p>
+        )}
       </SettingsCard>
       <SettingsCard title={t('about.licences')}>
         <ul className="flex flex-col gap-1 text-sm">

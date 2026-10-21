@@ -2,6 +2,7 @@
 // providers of the first release. The loop runs tools itself, so a model handle is only a model, its call settings and
 // its provider options.
 import { createAnthropic } from '@ai-sdk/anthropic';
+import { brand } from '@src/brand';
 import { createGoogle } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
 import type { LanguageModel } from 'ai';
@@ -103,12 +104,12 @@ export function createModel(spec: ModelSpec, options: CreateModelOptions = {}): 
     default: {
       // Ollama, LM Studio, OpenRouter and any other OpenAI-compatible server: chat completions at the base URL.
       const accounting = kind === 'openrouter' ? usageAccounting(fetch ?? globalThis.fetch) : null;
+      const attribution: Record<string, string> = { 'X-Title': brand.providerTitle };
+      if (brand.website) attribution['HTTP-Referer'] = brand.website;
       const openai = createOpenAI({
         apiKey: apiKey || kind,
         baseURL: openAICompatibleBaseUrl(kind, spec.baseUrl),
-        ...(kind === 'openrouter'
-          ? { headers: { 'HTTP-Referer': 'https://nanobrowser.ai', 'X-Title': 'Nanobrowser' } }
-          : {}),
+        ...(kind === 'openrouter' ? { headers: attribution } : {}),
         // OpenRouter reports a request's cost in its usage when asked.
         fetch: accounting?.fetch ?? fetch,
       });

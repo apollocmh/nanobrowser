@@ -17,7 +17,7 @@ export interface GuardVerdict {
   guard?: 'errors' | 'no_effect';
 }
 
-const NO_EFFECT_TOOLS = new Set(['click', 'set', 'type', 'press', 'fill_form']);
+const NO_EFFECT_TOOLS = new Set(['click', 'set', 'type', 'press', 'fill_form', 'drag', 'mouse_up']);
 
 function targetKey(args: Record<string, unknown>): string | null {
   const target = args.target ?? args.submit;

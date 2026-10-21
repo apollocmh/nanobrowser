@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" />
+  <title>Trusted gesture fixtures</title>
+  <style>
+    body { font: 16px Arial, sans-serif; margin: 16px; }
+    section { margin-bottom: 18px; }
+    .box { display: inline-block; width: 150px; height: 55px; padding: 10px; margin-right: 20px; background: #dde9f6; border: 2px solid #446; user-select: none; }
+    #canvas { display: block; border: 2px solid #446; touch-action: none; }
+    #sort { display: flex; list-style: none; padding: 0; }
+    #sort li { width: 130px; padding: 18px; margin-right: 16px; background: #e7e3ff; user-select: none; }
+    #slider { width: 340px; }
+  </style>
+  <h1>Trusted gestures</h1>
+  <section>
+    <div id="native-source" class="box" role="button" aria-label="Native source" draggable="true">Native source</div>
+    <div id="native-destination" class="box" role="button" aria-label="Native destination">Native destination</div>
+    <output id="native-status">Native idle</output>
+  </section>
+  <section>
+    <label for="slider">Volume</label><input id="slider" type="range" min="0" max="100" value="10" aria-label="Volume" />
+    <button id="delete-target" aria-label="Delete item">Delete item</button>
+  </section>
+  <section>
+    <canvas id="canvas" width="420" height="140" role="button" tabindex="0" aria-label="Flow workspace">Flow workspace</canvas>
+  </section>
+  <section>
+    <ul id="sort">
+      <li role="button" aria-label="Sort A" tabindex="0">Sort A</li>
+      <li role="button" aria-label="Sort B" tabindex="0">Sort B</li>
+    </ul>
+  </section>
+  <iframe title="Gesture frame" src="/gestures-inner.html" width="560" height="150"></iframe>
+  <iframe title="Cross-site gesture frame" src="http://127.0.0.1:8787/gestures-inner.html?cross=1" width="560" height="150"></iframe>
+  <script>
+    (function () {
+      var events = [];
+      var state = window.gestureFixture = { events: events, nativeDrops: 0, nodeX: 60, nodeY: 60, sorts: 0, sensitiveActivations: 0 };
+      var sensitive = document.getElementById('delete-target');
+      sensitive.addEventListener('click', function () { state.sensitiveActivations++; });
+      sensitive.addEventListener('drop', function () { state.sensitiveActivations++; });
+      ['pointerdown', 'mousedown', 'pointermove', 'mousemove', 'pointerup', 'mouseup', 'dragstart', 'dragenter', 'dragover', 'drop', 'dragend', 'input'].forEach(function (type) {
+        document.addEventListener(type, function (e) {
+          events.push({ type: type, trusted: e.isTrusted, buttons: e.buttons, target: e.target.id || e.target.getAttribute('aria-label') });
+          if (events.length > 2000) events.shift();
+        }, true);
+      });
+      document.getElementById('native-source').addEventListener('dragstart', function (e) { e.dataTransfer.setData('text/plain', 'fixture-source'); });
+      var destination = document.getElementById('native-destination');
+      destination.addEventListener('dragover', function (e) { e.preventDefault(); });
+      destination.addEventListener('drop', function (e) {
+        e.preventDefault();
+        if (e.isTrusted && e.dataTransfer.getData('text/plain') === 'fixture-source') {
+          state.nativeDrops++;
+          document.getElementById('native-status').textContent = 'Native dropped';
+        }
+      });
+      var canvas = document.getElementById('canvas');
+      var painting = canvas.getContext('2d');
+      var moving = false;
+      function draw() {
+        painting.clearRect(0, 0, 420, 140);
+        painting.fillStyle = '#3b64a3';
+        painting.fillRect(state.nodeX - 25, state.nodeY - 20, 50, 40);
+      }
+      canvas.addEventListener('pointerdown', function (e) { moving = e.isTrusted; canvas.setPointerCapture(e.pointerId); });
+      canvas.addEventListener('pointermove', function (e) {
+        if (!moving || !(e.buttons & 1)) return;
+        var rect = canvas.getBoundingClientRect();
+        state.nodeX = e.clientX - rect.left;
+        state.nodeY = e.clientY - rect.top;
+        draw();
+      });
+      canvas.addEventListener('pointerup', function () { moving = false; });
+      draw();
+      var sorting = null;
+      document.getElementById('sort').addEventListener('mousedown', function (e) { if (e.isTrusted) sorting = e.target; });
+      document.addEventListener('mousemove', function (e) {
+        if (!sorting || !e.isTrusted || !(e.buttons & 1)) return;
+        var other = document.elementFromPoint(e.clientX, e.clientY);
+        if (other && other.parentNode === sorting.parentNode && other !== sorting && other.nextElementSibling !== sorting) {
+          other.parentNode.insertBefore(other, sorting);
+          state.sorts++;
+        }
+      });
+      document.addEventListener('mouseup', function () { sorting = null; });
+    })();
+  </script>
+</html>

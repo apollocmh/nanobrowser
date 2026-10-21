@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Virtual mouse input fixture</title>
+<style>
+  html, body { margin: 0; background: #fff; min-height: 600px; }
+  button { position: absolute; left: 100px; top: 100px; width: 160px; height: 60px; }
+</style>
+<button id="target">Real input target</button>
+<script>
+  window.inputEvents = [];
+  ['mousedown', 'mousemove', 'mouseup', 'click', 'pointerdown', 'pointermove', 'pointerup'].forEach(function (type) {
+    document.addEventListener(type, function (event) {
+      window.inputEvents.push({ type: event.type, trusted: event.isTrusted, buttons: event.buttons, x: event.clientX, y: event.clientY });
+    });
+  });
+</script>
+</html>

@@ -1,3 +1,4 @@
+import '@src/compat/bootstrap';
 // The offscreen document: it does the one thing the worker cannot, turning text into a Blob and a URL for
 // chrome.downloads, and revokes the URL when the worker says the download ended. It uses only the runtime API.
 const urls = new Set<string>();

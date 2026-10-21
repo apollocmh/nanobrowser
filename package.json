@@ -23,7 +23,10 @@
     "upgrade-test": "node fixtures/upgrade-test.mjs",
     "install-chrome": "node fixtures/chrome.mjs install",
     "clean-chrome": "node fixtures/chrome.mjs clean",
-    "clean": "rimraf dist dist-zip .wxt .output"
+    "clean": "rimraf dist dist-mv2 dist-zip .wxt .output",
+    "build:mv2": "wxt build --mv2",
+    "build:all": "pnpm build && pnpm build:mv2",
+    "zip:mv2": "wxt zip --mv2"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "4.0.79",

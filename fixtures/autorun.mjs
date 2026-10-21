@@ -32,7 +32,11 @@ const option = name => {
   return i >= 0 ? argv[i + 1] : undefined;
 };
 const names = (
-  argv.find(a => !a.startsWith('--') && !['--args', '--timeout', '--scale'].includes(argv[argv.indexOf(a) - 1])) ?? ''
+  argv.find(
+    a =>
+      !a.startsWith('--') &&
+      !['--args', '--args-file', '--timeout', '--scale', '--chrome'].includes(argv[argv.indexOf(a) - 1]),
+  ) ?? ''
 )
   .split(',')
   .filter(Boolean);
@@ -40,17 +44,30 @@ if (!names.length) {
   console.error('usage: node fixtures/autorun.mjs <check>[,<check>...] [--args <json>] [--headful] [--no-build]');
   process.exit(2);
 }
-const args = option('--args') ? JSON.parse(option('--args')) : {};
+// A JSON file avoids .cmd quoting differences on Windows; accept PowerShell's UTF-8 BOM as well.
+const args = option('--args-file')
+  ? JSON.parse(readFileSync(resolve(root, option('--args-file')), 'utf8').replace(/^\uFEFF/, ''))
+  : option('--args')
+    ? JSON.parse(option('--args'))
+    : {};
 const timeoutMs = Number(option('--timeout') ?? 300) * 1000;
 const base = `http://localhost:${PORT}`;
 const productPermissions = flag('--product-permissions');
-const outDir = join(root, '.output', productPermissions ? 'autorun-product' : 'autorun');
+const legacy = flag('--mv2');
+const outDir = join(root, '.output', `autorun${legacy ? '-mv2' : ''}${productPermissions ? '-product' : ''}`);
 
 if (!flag('--no-build')) {
-  execFileSync('corepack', ['pnpm', 'exec', 'wxt', 'build'], {
+  // Use WXT's installed JS entry point: Windows cannot exec a .cmd shim directly.
+  const wxtBin = join(root, 'node_modules', 'wxt', 'bin', 'wxt.mjs');
+  execFileSync(process.execPath, [wxtBin, 'build', ...(legacy ? ['--mv2'] : [])], {
     cwd: root,
     stdio: ['ignore', 'ignore', 'inherit'],
-    env: { ...process.env, WXT_AUTORUN_URL: base, ...(productPermissions ? { WXT_PRODUCT_PERMISSIONS: '1' } : {}) },
+    env: {
+      ...process.env,
+      WXT_AUTORUN_URL: base,
+      ...(legacy ? { WXT_LEGACY: '1' } : {}),
+      ...(productPermissions ? { WXT_PRODUCT_PERMISSIONS: '1' } : {}),
+    },
   });
 }
 
@@ -82,7 +99,7 @@ const chromeArgs = [
   '--accept-lang=en-US',
   // A display with more than one device pixel per CSS pixel (a Retina display is 2).
   ...(option('--scale') ? [`--force-device-scale-factor=${option('--scale')}`] : []),
-  ...(flag('--headful') ? [] : ['--headless=new']),
+  ...(flag('--headful') || legacy ? [] : ['--headless=new']),
   // Headless Chrome announces itself in its user agent, and some real sites then serve a block page.
   ...(flag('--real-ua')
     ? [
@@ -91,8 +108,15 @@ const chromeArgs = [
     : []),
   'about:blank',
 ];
-const chrome = spawn(findChrome(), chromeArgs, { stdio: ['ignore', 'ignore', 'pipe'] });
+const chromePath = option('--chrome') ?? findChrome();
+const chrome = spawn(chromePath, chromeArgs, { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true });
 const consoleLines = [];
+const trace = [];
+autorunEvents.on('trace', entry => {
+  trace.push(entry);
+  if (trace.length > 300) trace.shift();
+  if (flag('--verbose')) console.log('  [trace]', typeof entry === 'string' ? entry : JSON.stringify(entry));
+});
 chrome.stderr.setEncoding('utf8');
 chrome.stderr.on('data', chunk => {
   for (const line of chunk.split('\n')) {
@@ -103,14 +127,18 @@ chrome.stderr.on('data', chunk => {
     }
   }
 });
+chrome.on('error', error => console.error('Browser launch failed:', error.message));
 
+const progressReports = [];
 autorunEvents.on('progress', report => {
-  console.log(`${report.ok ? 'PASS' : 'FAIL'} ${report.name} (${report.durationMs} ms)`);
+  progressReports.push(report);
+  const status = !report.ok ? 'FAIL' : report.result?.status === 'partial' ? 'PARTIAL' : 'PASS';
+  console.log(`${status} ${report.name} (${report.durationMs} ms)`);
   if (!report.ok) console.log(report.error);
 });
 
 const result = await new Promise(resolveResult => {
-  const timer = setTimeout(() => resolveResult({ timedOut: true, reports: [] }), timeoutMs);
+  const timer = setTimeout(() => resolveResult({ timedOut: true, reports: [...progressReports] }), timeoutMs);
   autorunEvents.once('report', body => {
     clearTimeout(timer);
     resolveResult({ timedOut: false, ...body });
@@ -119,13 +147,26 @@ const result = await new Promise(resolveResult => {
     clearTimeout(timer);
     resolveResult({ timedOut: false, exited: code, reports: [] });
   });
+  chrome.once('error', error => {
+    clearTimeout(timer);
+    resolveResult({ timedOut: false, launchError: error.message, reports: [] });
+  });
 });
 
-const exited = new Promise(r => (chrome.exitCode !== null ? r() : chrome.once('exit', r)));
-chrome.kill();
+const exited = new Promise(r => (chrome.exitCode !== null || !chrome.pid ? r() : chrome.once('exit', r)));
+// Windows' Chromium parent process exits before its children. Kill only this test process tree.
+if (process.platform === 'win32' && chrome.pid && chrome.exitCode === null) {
+  try {
+    execFileSync('taskkill.exe', ['/PID', String(chrome.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true });
+  } catch {
+    chrome.kill();
+  }
+} else chrome.kill();
 await exited;
 server.close();
 try {
+  if (!resolve(profile).startsWith(resolve(tmpdir()) + (process.platform === 'win32' ? '\\' : '/')))
+    throw new Error('Refusing to clean a profile outside the temporary directory');
   rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 } catch {
   // A leftover temporary profile is harmless.
@@ -150,7 +191,21 @@ const extractImages = value => {
     return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, extractImages(v)]));
   return value;
 };
-writeFileSync(file, JSON.stringify(extractImages({ names, args, ...result, console: consoleLines }), null, 2));
+writeFileSync(
+  file,
+  JSON.stringify(
+    extractImages({
+      names,
+      args,
+      browser: { path: chromePath, legacy, headful: legacy || flag('--headful') },
+      ...result,
+      trace,
+      console: consoleLines,
+    }),
+    null,
+    2,
+  ),
+);
 console.log(`results: ${file}`);
 if (result.timedOut) console.log('TIMEOUT: no report from the extension');
 const failed = result.timedOut || !result.reports.length || result.reports.some(r => !r.ok);

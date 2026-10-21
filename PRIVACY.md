@@ -1,5 +1,15 @@
 # Privacy Policy for Nanobrowser
 
+## Internal build defaults
+
+This internal derivative is branded through `src/brand.ts`. Its default configuration disables analytics delivery,
+store-rating prompts, and uninstall questionnaires. It does not send usage statistics to the Nanobrowser team.
+Maintainers may enable analytics and configure its destination at build time; user consent switches continue to apply.
+OpenRouter receives the configured ASCII application title; a website referrer is sent only if one is configured.
+Conversations and provider keys remain local, with model/voice requests sent to the providers the user selects as
+described below. The upstream analytics defaults below describe an analytics-enabled upstream build, not these
+internal defaults. See [the internal deployment notes](docs/INTERNAL_DEPLOYMENT.md) for the build configuration.
+
 ## Introduction
 
 [Nanobrowser](https://github.com/nanobrowser/nanobrowser) is an open-source AI web automation extension for Chrome and Edge. This Privacy Policy explains how it handles your data.

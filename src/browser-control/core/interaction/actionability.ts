@@ -30,6 +30,12 @@ export interface Needs {
    * wheel there, which activates nothing, so the rule against nested controls (made for clicks) does not apply.
    */
   overControls?: boolean;
+  /** A point within the node's quad, expressed as fractions. */
+  offset?: Point;
+  /** Held gestures must not scroll or retry between input events. */
+  noScroll?: boolean;
+  /** Dragging may legitimately move the same node out of its original row. */
+  context?: boolean;
 }
 
 export interface Actionable {
@@ -68,11 +74,23 @@ function nestedHit(error: LayerError): boolean {
   return error.code === 'OBSCURED' && (error.details as { kind?: string } | undefined)?.kind === 'nested';
 }
 
-async function scrollIntoView(ctx: ToolContext, target: ResolvedTarget): Promise<void> {
+export async function scrollIntoView(ctx: ToolContext, target: ResolvedTarget): Promise<void> {
   const { cdp } = await ctx.attach();
-  await cdp
-    .send(target.frame.sessionId, 'DOM.scrollIntoViewIfNeeded', { backendNodeId: target.record.backendNodeId })
-    .catch(() => undefined);
+  const probe = ctx.tab().probe!;
+  const scroll = async (frame: FrameRecord, backendNodeId: number) => {
+    try {
+      await cdp.send(frame.sessionId, 'DOM.scrollIntoViewIfNeeded', { backendNodeId });
+    } catch (error) {
+      if (!/wasn't found|not found|not supported|unknown method/i.test(String(error))) throw error;
+      const objectId = await probe.resolve(frame, backendNodeId);
+      try {
+        await probe.call(frame, objectId, 'scrollIntoView');
+      } finally {
+        await probe.release(frame, objectId);
+      }
+    }
+  };
+  await scroll(target.frame, target.record.backendNodeId);
   // An out-of-process frame scrolls only its own document; bring each owner iframe into view in its parent too.
   const byId = new Map(target.frames.map(f => [f.frameId, f]));
   let root = sessionRoot(target.frames, target.frame);
@@ -83,7 +101,7 @@ async function scrollIntoView(ctx: ToolContext, target: ResolvedTarget): Promise
       const { backendNodeId } = await cdp.send<{ backendNodeId: number }>(parent.sessionId, 'DOM.getFrameOwner', {
         frameId: root.frameId,
       });
-      await cdp.send(parent.sessionId, 'DOM.scrollIntoViewIfNeeded', { backendNodeId });
+      await scroll(parent, backendNodeId);
     } catch {
       // The frame is going away; the checks below report it.
     }
@@ -103,12 +121,12 @@ async function firstQuad(ctx: ToolContext, target: ResolvedTarget): Promise<Quad
   }
 }
 
-async function checkOnce(ctx: ToolContext, target: ResolvedTarget, needs: Needs): Promise<Actionable> {
+export async function checkOnce(ctx: ToolContext, target: ResolvedTarget, needs: Needs): Promise<Actionable> {
   const probe = ctx.tab().probe!;
   const name = target.description;
   const state = await probe.call<ProbeState>(target.frame, target.objectId, 'state');
   if (!state.connected) throw new LayerError('NODE_DETACHED', `${name} is no longer in the page`);
-  await scrollIntoView(ctx, target);
+  if (!needs.noScroll) await scrollIntoView(ctx, target);
   if (!state.enabled) throw new LayerError('DISABLED', `${name} is disabled`);
   if (needs.editable && !state.editable) throw new LayerError('NOT_EDITABLE', `${name} does not accept text`);
   let quad = state.visible ? await firstQuad(ctx, target) : null;
@@ -118,7 +136,7 @@ async function checkOnce(ctx: ToolContext, target: ResolvedTarget, needs: Needs)
   const pointOf = async (): Promise<{ quad: Quad; point: Point } | null> => {
     if (!viaLabel) {
       const q = await firstQuad(ctx, target);
-      return q ? { quad: q, point: quadCenter(q) } : null;
+      return q ? { quad: q, point: needs.offset ? quadPoint(q, needs.offset) : quadCenter(q) } : null;
     }
     return labelPoint(ctx, target);
   };
@@ -156,8 +174,17 @@ async function checkOnce(ctx: ToolContext, target: ResolvedTarget, needs: Needs)
   if (needs.pointer) await hitTest(ctx, target, b, chain, !!needs.overControls);
   // The wait above can last seconds, and it scrolls: the element that is now actionable must still be the one the
   // session was shown. A node hidden when it was resolved had nothing to compare until now.
-  await assertAsShown(ctx, target, { context: true });
+  await assertAsShown(ctx, target, { context: needs.context ?? true });
   return { point: top, localPoint: b, chain, quad: again!, state };
+}
+
+/** Bilinear interpolation preserves positions within rotated and transformed quads. */
+export function quadPoint(q: Quad, offset: Point): Point {
+  const { x, y } = offset;
+  return {
+    x: q[0] * (1 - x) * (1 - y) + q[2] * x * (1 - y) + q[4] * x * y + q[6] * (1 - x) * y,
+    y: q[1] * (1 - x) * (1 - y) + q[3] * x * (1 - y) + q[5] * x * y + q[7] * (1 - x) * y,
+  };
 }
 
 /** The receives-events check: in the target's session, then at every process boundary up to the top. */

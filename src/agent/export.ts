@@ -4,6 +4,7 @@ import type { Conversation, Entry } from '@src/store/types';
 import type { ToolRow } from '@src/ui/protocol';
 import { runRows } from '@src/ui/protocol';
 import { toDisplay } from './display';
+import { brand } from '@src/brand';
 
 const ICON: Record<ToolRow['status'], string> = { running: '…', done: '✓', failed: '✗', skipped: '–', waiting: '!' };
 
@@ -33,7 +34,7 @@ export function conversationMarkdown(conversation: Conversation, branch: Entry[]
   const lines = [
     `# ${conversation.title || 'Conversation'}`,
     '',
-    `_Exported from Nanobrowser on ${stamp(now.toISOString())}._`,
+    `_Exported from ${brand.name} on ${stamp(now.toISOString())}._`,
     '',
   ];
   // The page read when a run began goes with the run's first steps, as in the panel.
@@ -50,7 +51,7 @@ export function conversationMarkdown(conversation: Conversation, branch: Entry[]
       const rows = runRows(e.tools, opened);
       opened = undefined;
       if (rows.length) lines.push('Steps:', ...steps(rows), '');
-      if (e.text) lines.push(`## Nanobrowser · ${stamp(e.at)}`, '', e.text, '');
+      if (e.text) lines.push(`## ${brand.name} · ${stamp(e.at)}`, '', e.text, '');
     } else if (e.kind === 'notice') {
       lines.push(`> ${e.text}`, '');
     } else if (e.kind === 'download') {

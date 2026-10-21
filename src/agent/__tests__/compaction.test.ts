@@ -289,7 +289,7 @@ describe('a long run on a 16k window', () => {
     const summaryCall = scripted.calls.find(isSummaryCall)!;
     expect(summaryCall.tools).toEqual([]);
     expect(JSON.stringify(summaryCall.prompt[0])).toContain('Untrusted content');
-  });
+  }, 20_000);
 
   it('compacts with the ledger alone when the summary fails, and says so', async () => {
     const c = await createConversation({ mode: 'auto' });

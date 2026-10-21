@@ -9,9 +9,14 @@ import { handleDialog } from './dialog';
 import { askUser } from './ask';
 import { fillForm } from './fill';
 import { upload } from './upload';
+import { drag, mouseDown, mouseMove, mouseUp } from './gesture';
 
 /** Tool name to handler. Arguments arrive validated against the catalogue's schema. */
 export const TOOL_HANDLERS: Record<string, ToolHandler> = {
+  mouse_down: (ctx, args) => mouseDown(ctx, args as never),
+  mouse_move: (ctx, args) => mouseMove(ctx, args as never),
+  mouse_up: (ctx, args) => mouseUp(ctx, args as never),
+  drag: (ctx, args) => drag(ctx, args as never),
   snapshot: (ctx, args) => snapshot(ctx, args as never),
   find: (ctx, args) => find(ctx, args as never),
   read: (ctx, args) => read(ctx, args as never),

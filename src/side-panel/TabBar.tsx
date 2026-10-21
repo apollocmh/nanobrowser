@@ -5,6 +5,7 @@ import type { ScopeTab } from '@src/ui/protocol';
 import { t } from '@src/ui/i18n';
 import { plain } from './Cards';
 import { CloseIcon } from '@src/ui/icons';
+import { panelTabId } from './client';
 
 export function TabBar({ tabs, onUnshare }: { tabs: ScopeTab[]; onUnshare: (tabId: number) => void }) {
   if (!tabs.length) return null;
@@ -47,7 +48,10 @@ export function TabPicker({
 }) {
   const [tabs, setTabs] = useState<chrome.tabs.Tab[]>([]);
   useEffect(() => {
-    void chrome.tabs.query({ currentWindow: true }).then(setTabs);
+    void panelTabId()
+      .then(id => chrome.tabs.get(id))
+      .then(tab => chrome.tabs.query({ windowId: tab.windowId }))
+      .then(setTabs);
   }, []);
   const q = query.toLowerCase();
   const shown = tabs.filter(

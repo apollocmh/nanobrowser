@@ -1,0 +1,23 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Compatibility</title>
+<style>
+  body { margin: 16px; font: 16px sans-serif; }
+  button,input { padding: 8px; }
+  iframe { width: 360px; height: 160px; border: 1px solid #aaa; }
+  #bottom { margin-top: 2200px; height: 180px; background: rgb(220,10,20); }
+</style>
+<h1>Compatibility fixture</h1>
+<button id="increment" type="button">Increment</button><output id="count">0</output>
+<label>Full name <input id="name" value="Ada"></label>
+<label>Password <input type="password" value="compat-secret"></label>
+<iframe title="Same origin" src="/compatibility-inner.html"></iframe>
+<iframe title="Cross origin" src="http://127.0.0.1:8787/compatibility-inner.html"></iframe>
+<div id="bottom" aria-label="Bottom sentinel">Bottom sentinel</div>
+<script>
+  window.events = [];
+  document.getElementById('increment').onclick = function (event) {
+    window.events.push({ type: event.type, trusted: event.isTrusted });
+    document.getElementById('count').textContent = String(Number(document.getElementById('count').textContent) + 1);
+  };
+</script>

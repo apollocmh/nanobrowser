@@ -52,7 +52,12 @@ defineCheck({
         st => st === 'Done',
         'run done',
       );
-    const group = async () => (await chrome.tabs.get(id)).groupId;
+    const group = async () => {
+      if (typeof chrome.tabs.group === 'function') return (await chrome.tabs.get(id)).groupId;
+      const scope = (await chrome.storage.session.get('nb.scope'))['nb.scope'] as
+        { tabs: Record<string, { conversationId: string }> } | undefined;
+      return scope?.tabs[id]?.conversationId;
+    };
     try {
       await panel(id, 'type-send', { text: 'First conversation about laptops' });
       await waitForText(id, 'You said: First conversation about laptops');

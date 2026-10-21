@@ -123,6 +123,46 @@ export const PressArgsSchema = z.strictObject({
 
 export const HoverArgsSchema = z.strictObject({ ...actionCommon, target: TargetSchema });
 
+const mouseOffset = z.strictObject({
+  x: z.number().min(0).max(1).describe('Fraction across the target quad; 0 is left, 1 is right'),
+  y: z.number().min(0).max(1).describe('Fraction down the target quad; 0 is top, 1 is bottom'),
+});
+const mouseDestination = {
+  target: TargetSchema,
+  offset: mouseOffset.optional().describe('Position inside the target; default: its centre'),
+};
+export const MouseDownArgsSchema = z.strictObject({
+  ...actionCommon,
+  ...mouseDestination,
+  gestureTimeoutMs: z
+    .number()
+    .int()
+    .min(1000)
+    .max(120_000)
+    .optional()
+    .describe('Held-button deadline; default 30000 ms'),
+});
+export const MouseMoveArgsSchema = z.strictObject({
+  ...actionCommon,
+  ...mouseDestination,
+  gestureId: z.string().min(1).max(128).describe('The gestureId returned by mouse_down'),
+  durationMs: z.number().int().min(0).max(2000).optional(),
+});
+export const MouseUpArgsSchema = z.strictObject({
+  ...actionCommon,
+  ...mouseDestination,
+  gestureId: z.string().min(1).max(128),
+});
+export const DragArgsSchema = z.strictObject({
+  ...actionCommon,
+  source: TargetSchema,
+  sourceOffset: mouseOffset.optional(),
+  ...mouseDestination,
+  path: z.array(z.strictObject(mouseDestination)).max(60).optional().describe('Observed targets along the drag path'),
+  durationMs: z.number().int().min(0).max(10_000).optional().describe('Total movement duration; default 500 ms'),
+  steps: z.number().int().min(2).max(120).optional().describe('Real CDP movement steps across the path; default 20'),
+});
+
 export const ScrollArgsSchema = z.strictObject({
   ...actionCommon,
   target: TargetSchema.optional().describe('The container to scroll; default: the page'),
@@ -204,6 +244,10 @@ export type FillFormArgs = z.infer<typeof FillFormArgsSchema>;
 export type TypeArgs = z.infer<typeof TypeArgsSchema>;
 export type PressArgs = z.infer<typeof PressArgsSchema>;
 export type HoverArgs = z.infer<typeof HoverArgsSchema>;
+export type MouseDownArgs = z.infer<typeof MouseDownArgsSchema>;
+export type MouseMoveArgs = z.infer<typeof MouseMoveArgsSchema>;
+export type MouseUpArgs = z.infer<typeof MouseUpArgsSchema>;
+export type DragArgs = z.infer<typeof DragArgsSchema>;
 export type ScrollArgs = z.infer<typeof ScrollArgsSchema>;
 export type WaitArgs = z.infer<typeof WaitArgsSchema>;
 export type NavigateArgs = z.infer<typeof NavigateArgsSchema>;

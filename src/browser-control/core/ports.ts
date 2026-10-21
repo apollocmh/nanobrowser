@@ -6,6 +6,8 @@ export type SessionId = string | undefined;
 
 export interface CdpPort {
   readonly tabId: number;
+  /** Host-confirmed protocol capabilities. Missing means unavailable, never a guessed browser version in core. */
+  readonly capabilities?: { nativeDrag: boolean };
   /** Rejects with LayerError DEBUGGER_DETACHED once the tab is detached, and with CdpTimeoutError on timeout. */
   send<T = unknown>(sessionId: SessionId, method: string, params?: object, timeoutMs?: number): Promise<T>;
   /** Subscribes to an event from every session of the tab, or with `only` from one session. */
@@ -47,8 +49,20 @@ export interface ScreenshotOptions {
   clip?: { x: number; y: number; width: number; height: number };
 }
 
+export interface ScreenshotCapture {
+  method: 'native' | 'viewport-override';
+  pageMayHaveReacted: boolean;
+  restored: boolean;
+}
+
 /** The jobs Puppeteer keeps besides frames: keyboard, navigation with load waits, screenshots. */
 export interface PagePort {
+  /** Legacy full-page capture keeps its temporary viewport until redaction is complete. */
+  prepareScreenshot?(options: ScreenshotOptions, viewport: { width: number; height: number }): Promise<{
+    changed: boolean;
+    capture: ScreenshotCapture;
+    restore(): Promise<void>;
+  }>;
   screenshot(options: ScreenshotOptions): Promise<{ base64: string; width: number; height: number }>;
   /** A chord as it is pressed: modifiers mapped (ControlOrMeta) and checked, then the key; unknown keys throw. */
   chord(keys: string): { modifiers: string[]; key: string };

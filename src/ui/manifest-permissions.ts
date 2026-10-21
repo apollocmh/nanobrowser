@@ -35,7 +35,16 @@ export interface PermissionLists {
 }
 
 /** The manifest's two lists: the product asks for the four when the user allows them, the autorun build at install. */
-export function permissionLists(build: 'product' | 'autorun'): PermissionLists {
+export function permissionLists(build: 'product' | 'autorun', legacy = false): PermissionLists {
+  if (legacy) {
+    const required = REQUIRED_PERMISSIONS.filter(p => !['sidePanel', 'offscreen', 'scripting'].includes(p));
+    const optional = OPTIONAL_PERMISSIONS.filter(p => p !== 'tabGroups');
+    // MV2 declares hosts in permissions, before the MV3 host_permissions split.
+    const permissions = [...required, '<all_urls>'] as chrome.runtime.ManifestPermission[];
+    return build === 'product'
+      ? { permissions, optional_permissions: [...optional] }
+      : { permissions: [...permissions, ...optional], optional_permissions: [] };
+  }
   return build === 'product'
     ? { permissions: [...REQUIRED_PERMISSIONS], optional_permissions: [...OPTIONAL_PERMISSIONS] }
     : { permissions: [...REQUIRED_PERMISSIONS, ...OPTIONAL_PERMISSIONS], optional_permissions: [] };

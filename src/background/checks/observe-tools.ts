@@ -30,7 +30,7 @@ defineCheck({
       assert(snap.ok, `snapshot failed: ${snap.text}`);
       const data = snap.data as SnapshotData;
       assert(data.refs >= 30, `expected at least 30 refs, got ${data.refs}`);
-      assert(/<<<page-content [0-9a-f]{12}>>>/.test(snap.text), 'page text sits inside the boundary');
+      assert(/<<<page-content [0-9a-f]{12}(?: site=[^>]+)?>>>/.test(snap.text), 'page text sits inside the boundary');
       for (const s of SECRETS) assert(!JSON.stringify(snap).includes(s), `secret "${s}" leaked into the snapshot`);
       out.snapshot = {
         refs: data.refs,
@@ -73,8 +73,7 @@ defineCheck({
       const errors: Record<string, string | undefined> = {};
       errors.unknownRef = (await session.call('read', { ref: 'zz999' })).error?.code;
       errors.badArgs = (await session.call('snapshot', { mode: 'everything' })).error?.code;
-      errors.unavailable = (await session.call('fill_form', { fields: [{ target: { ref: 'e1' }, value: 'x' }] })).error
-        ?.code;
+      errors.unavailable = (await session.call('not_a_browser_tool', {})).error?.code;
       errors.capability = (await session.call('ask_user', { message: 'hi', kind: 'takeover' })).error?.code;
       errors.notInSession = (await session.call('snapshot', { tabId: 999999 })).error?.code;
       assert(errors.unknownRef === 'REF_UNKNOWN', `unknown ref: ${errors.unknownRef}`);

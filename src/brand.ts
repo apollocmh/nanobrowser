@@ -1,0 +1,20 @@
+/** Build-time product identity. Asset paths are relative to public/. Keep storage keys unchanged across branding. */
+export const brand = {
+  name: '知安大模型',
+  providerTitle: 'ZhiAn',
+  description: '知安大模型——在浏览器中理解页面并安全执行任务的 AI 助手',
+  icon: 'brand/iie-mark-128.png',
+  toolbarIcon: 'brand/iie-mark-32.png',
+  logo: 'brand/iie-logo-compact.png',
+  accent: '37 99 235',
+  accentStrong: '29 78 216',
+  sky: '56 189 248',
+  website: '',
+  help: '',
+  privacy: '',
+  chromeStore: '',
+  edgeStore: '',
+  uninstallUrl: '',
+  analyticsEnabled: false,
+  ratingEnabled: false,
+} as const;

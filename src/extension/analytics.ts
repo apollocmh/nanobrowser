@@ -1,3 +1,4 @@
+import { brand } from '@src/brand';
 // Analytics in the worker: the start-up step that applies the old version's choice, the daily counts and the triggers
 // that send. It is the only code that writes the analytics keys. Nothing is sent before the
 // start-up step has finished, and nothing at all from a build with no destination.
@@ -53,7 +54,7 @@ import { upgradeFromOldVersion } from './upgrade';
 const MAX_TRIES = 3;
 const KEEP_DAYS = 7;
 
-const DESTINATION = destinationOf(import.meta.env);
+const DESTINATION = brand.analyticsEnabled || import.meta.env.WXT_AUTORUN_URL ? destinationOf(import.meta.env) : null;
 
 const local = chrome.storage.local;
 

@@ -1,4 +1,6 @@
 dist
+dist-mv2
+dist-zip
 node_modules
 .wxt/
 .output/

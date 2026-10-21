@@ -46,6 +46,7 @@ import type { AttachmentRef, PanelCommand, PanelEventBody } from '@src/ui/protoc
 import { createAgentSession, layerPort } from './agent-session';
 import { TabScope } from './bindings';
 import { PageBorder, injectBorder, listenForBorder } from './border';
+import { pageCursor } from './cursor';
 import { addPromptRoute, controllerReady } from './layer';
 import { Permissions } from './permissions';
 import { PromptBroker } from './prompt-broker';
@@ -192,6 +193,13 @@ export class RunManager {
    */
   #stop(conversationId: string): void {
     this.#runs.get(conversationId)?.controller.abort();
+    void (async () => {
+      await this.#sessions
+        .get(conversationId)
+        ?.cancelGestures()
+        .catch(() => undefined);
+      for (const tabId of await this.scope.tabsOf(conversationId)) await pageCursor.clear(tabId);
+    })();
     this.broker.withdrawAll(conversationId);
     const returned = this.#queues.get(conversationId)?.splice(0) ?? [];
     this.#emitQueue(conversationId, returned);
@@ -375,7 +383,9 @@ export class RunManager {
   async #watchdog(): Promise<void> {
     if (!globalThis.chrome?.alarms) return;
     const unfinished = this.#runs.size > 0 || (await listRuns()).some(r => UNFINISHED.has(r.status));
-    if (unfinished) await chrome.alarms.create('nb-watchdog', { periodInMinutes: 0.5 });
+    if (unfinished) await chrome.alarms.create('nb-watchdog', {
+      periodInMinutes: chrome.runtime.getManifest().manifest_version === 2 ? 1 : 0.5,
+    });
     else await chrome.alarms.clear('nb-watchdog');
   }
 
@@ -1235,6 +1245,13 @@ export class RunManager {
     this.emit(record.conversationId, { type: 'run_status', status, reason, startedAt: record.startedAt });
     await this.scope.status(record.conversationId, status, conversation?.title ?? '');
     void this.border.status(record.conversationId, status).catch(() => undefined);
+    if (status !== 'running') {
+      await this.#sessions
+        .get(record.conversationId)
+        ?.cancelGestures()
+        .catch(() => undefined);
+      for (const tabId of await this.scope.tabsOf(record.conversationId)) void pageCursor.clear(tabId);
+    }
   }
 
   /** Continue and Resume: a new run on the same context, opened by a note. */

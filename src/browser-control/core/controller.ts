@@ -25,6 +25,7 @@ import { siteOf } from './site';
 import { TOOL_HANDLERS } from './tools';
 import { maskSecrets, redactArgs } from './redact';
 import { MASK } from './perception/masking';
+import { assertGestureTool, cancelGesture, forgetGesture } from './interaction/gestures';
 
 export interface ControllerHost {
   attacher: Attacher;
@@ -204,6 +205,7 @@ export class Controller {
 
   /** Ends a session: its tabs are released (detached when no other session holds them) and it is forgotten. */
   async closeSession(session: Session): Promise<void> {
+    await session.cancelGestures();
     this.#sessions.delete(session.id);
     for (const tabId of session.tabIds()) {
       session.forgetTab(tabId);
@@ -299,6 +301,7 @@ export class Controller {
           // Any navigation ends the reuse of the last capture.
           attachment.topology.onFrameEvent(event => {
             if (event.type !== 'attached') state.last = undefined;
+            if (event.type !== 'attached') void cancelGesture(state);
             // A chooser's input goes with its document.
             if (event.type !== 'attached' && state.fileChooser?.frameId === event.frameId) {
               state.fileChooser = null;
@@ -315,6 +318,7 @@ export class Controller {
               defaultPrompt: p.defaultPrompt,
               hasBrowserHandler: p.hasBrowserHandler ?? true,
             };
+            void cancelGesture(state);
             const detail = dialogDetail(p);
             if (!state.pending.some(m => m.kind === 'dialog')) state.pending.push({ kind: 'dialog', detail });
           });
@@ -346,6 +350,7 @@ export class Controller {
           });
           attachment.onDetach(info => {
             if (state.attachment !== attachment) return;
+            forgetGesture(state);
             state.guard?.dispose();
             state.guard = null;
             state.probe = null;
@@ -404,6 +409,7 @@ export class Controller {
     if (this.sessions().some(s => s.hasTab(tabId))) return;
     void this.host.tabs.setDiscardable?.(tabId, true);
     const state = this.#tabs.get(tabId);
+    if (state) await cancelGesture(state);
     // Removed first: an attach still in progress sees its state gone and closes what it attached.
     this.#tabs.delete(tabId);
     if (state?.attachment) await state.attachment.close().catch(() => undefined);
@@ -434,6 +440,8 @@ export class Controller {
   }
 
   #tabRemoved(tabId: number): void {
+    const state = this.#tabs.get(tabId);
+    if (state) forgetGesture(state);
     for (const session of this.#sessions.values()) session.forgetTab(tabId);
     this.registry.tabDetached(tabId);
     this.#tabs.delete(tabId);
@@ -600,6 +608,7 @@ export class Session {
   }
 
   async unshareTab(tabId: number): Promise<void> {
+    await cancelGesture(this.controller.tabState(tabId), this.id);
     this.forgetTab(tabId);
     await this.controller.release(tabId);
   }
@@ -609,6 +618,11 @@ export class Session {
     this.known.forget(tabId);
     this.seen.delete(tabId);
     if (this.#active === tabId) this.#active = this.#tabs.values().next().value ?? null;
+  }
+
+  /** Stop also releases a staged gesture whose mouse_down call already returned. */
+  async cancelGestures(): Promise<void> {
+    await Promise.all(this.tabIds().map(tabId => cancelGesture(this.controller.tabState(tabId), this.id)));
   }
 
   setActive(tabId: number): void {
@@ -733,6 +747,7 @@ export class Session {
       };
       const run = () => {
         checkCancelled(ctx);
+        if (tabId !== null) assertGestureTool(ctx.tab(), this.id, tool, readOnly);
         return handler(ctx, args);
       };
       const outcome = tabId === null ? await run() : await this.controller.locks.run(tabId, run);

@@ -1,0 +1,9 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Compatibility inner</title>
+<button id="inner" type="button">Inner action</button><output id="status">Ready</output>
+<script>
+  document.getElementById('inner').onclick = function (event) {
+    document.getElementById('status').textContent = event.isTrusted ? 'Trusted action' : 'Synthetic action';
+  };
+</script>

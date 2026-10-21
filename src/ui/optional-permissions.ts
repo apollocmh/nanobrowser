@@ -42,7 +42,13 @@ export function useGrantedPermissions(): GrantedPermissions | null {
 
 /** True when every one of the four is allowed. */
 export function allGranted(granted: GrantedPermissions | null): boolean {
-  return !!granted && OPTIONAL_PERMISSIONS.every(p => granted[p]);
+  return !!granted && availablePermissions().every(p => granted[p]);
+}
+
+function availablePermissions(): readonly OptionalPermission[] {
+  return chrome.runtime.getManifest().manifest_version === 2
+    ? OPTIONAL_PERMISSIONS.filter(p => p !== 'tabGroups')
+    : OPTIONAL_PERMISSIONS;
 }
 
 /**
@@ -54,7 +60,9 @@ export function requestOptionalPermissions(
   permissions: readonly OptionalPermission[] = OPTIONAL_PERMISSIONS,
 ): Promise<boolean> {
   try {
-    return chrome.permissions.request({ permissions: [...permissions] }).catch(() => false);
+    return chrome.permissions
+      .request({ permissions: permissions.filter(p => availablePermissions().includes(p)) })
+      .catch(() => false);
   } catch {
     return Promise.resolve(false);
   }

@@ -5,11 +5,15 @@ import { Switch } from '@src/ui/components';
 import { useStorage } from '@src/ui/hooks';
 import { t } from '@src/ui/i18n';
 import { SettingsCard, SettingsRow } from './SettingsCard';
+import { brand } from '@src/brand';
 
-export const PRIVACY_URL = 'https://github.com/nanobrowser/nanobrowser/blob/HEAD/PRIVACY.md';
+export const PRIVACY_URL = brand.privacy;
 
 export function PrivacyCard() {
   const settings = useStorage(settingsStorage, DEFAULT_SETTINGS);
+  if (!brand.analyticsEnabled) {
+    return <SettingsCard title={t('privacy.title')} description={t('privacy.disabled')} />;
+  }
   return (
     <SettingsCard title={t('privacy.title')} className="flex flex-col gap-6">
       <SettingsRow label={t('privacy.ping')} description={t('privacy.pingHint')}>
@@ -26,9 +30,11 @@ export function PrivacyCard() {
           onChange={on => void settingsStorage.set(s => ({ ...s, analyticsStats: on }))}
         />
       </SettingsRow>
-      <a className="self-start text-sm text-nb-accent underline" href={PRIVACY_URL} target="_blank" rel="noreferrer">
-        {t('privacy.policy')}
-      </a>
+      {PRIVACY_URL && (
+        <a className="self-start text-sm text-nb-accent underline" href={PRIVACY_URL} target="_blank" rel="noreferrer">
+          {t('privacy.policy')}
+        </a>
+      )}
     </SettingsCard>
   );
 }

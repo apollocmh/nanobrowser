@@ -71,7 +71,7 @@ export class PanelClient {
 export async function panelTabId(): Promise<number> {
   // Unattended checks open the panel page in a tab of its own and name the tab it stands for. Only autorun builds read
   // this; a normal build takes nothing from the address.
-  if (import.meta.env.WXT_AUTORUN_URL) {
+  if (import.meta.env.WXT_AUTORUN_URL || chrome.runtime.getManifest().manifest_version === 2) {
     const named = /[#&]tab=(\d+)/.exec(location.hash)?.[1];
     if (named) return Number(named);
   }

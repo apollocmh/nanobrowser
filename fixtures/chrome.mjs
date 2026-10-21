@@ -11,9 +11,13 @@ import { existsSync, readdirSync, rmSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, relative, sep } from 'node:path';
 import { createInterface } from 'node:readline';
+import { createRequire } from 'node:module';
+import { dirname, resolve } from 'node:path';
 
 // The version of @puppeteer/browsers that puppeteer-core depends on, run without adding a dependency.
-const browsersCli = '@puppeteer/browsers@3.2.3';
+const require = createRequire(import.meta.url);
+const browsersEntry = createRequire(require.resolve('puppeteer-core')).resolve('@puppeteer/browsers');
+const browsersCli = join(dirname(browsersEntry), 'main-cli.js');
 const cacheDir = join(homedir(), '.cache', 'puppeteer');
 const chromeDir = join(cacheDir, 'chrome');
 const [command, ...flags] = process.argv.slice(2);
@@ -40,16 +44,19 @@ function confirm(question) {
 
 // pnpm dlx through the pnpm that runs this script (npm_execpath), so corepack pnpm works without a global pnpm.
 function dlx(args) {
-  const execPath = process.env.npm_execpath;
-  const [cmd, cmdArgs] = /\.[cm]?js$/.test(execPath ?? '')
-    ? [process.execPath, [execPath, 'dlx', ...args]]
-    : ['pnpm', ['dlx', ...args]];
-  const result = spawnSync(cmd, cmdArgs, { stdio: ['ignore', 'pipe', 'inherit'], encoding: 'utf8' });
+  const result = spawnSync(process.execPath, [browsersCli, ...args.slice(1)], { stdio: ['ignore', 'pipe', 'inherit'], encoding: 'utf8', windowsHide: true });
   if (result.status !== 0) {
     process.stdout.write(result.stdout ?? '');
     throw new Error(`${browsersCli} install failed${result.error ? `: ${result.error.message}` : ''}`);
   }
   return result.stdout;
+}
+
+function removeCachePath(target) {
+  const absolute = resolve(target);
+  if (!absolute.startsWith(resolve(cacheDir) + sep) && absolute !== resolve(cacheDir))
+    throw new Error(`Refusing to remove a path outside the browser cache: ${absolute}`);
+  rmSync(absolute, { recursive: true, force: true });
 }
 
 if (command === 'install') {
@@ -71,7 +78,7 @@ if (command === 'install') {
     console.log(`Other builds in ${chromeDir}:`);
     for (const build of others) console.log(`  ${build}`);
     if (await confirm(`Remove these ${others.length} builds and keep only ${installed}?`)) {
-      for (const build of others) rmSync(join(chromeDir, build), { recursive: true, force: true });
+      for (const build of others) removeCachePath(join(chromeDir, build));
       console.log('Removed.');
     }
   }
@@ -86,7 +93,7 @@ if (command === 'install') {
       console.log(`  ${entry.name}: ${builds.map(d => d.name).join(', ') || '(empty)'}`);
     }
     if (await confirm(`Remove all of ${cacheDir}? Other projects that use Puppeteer download their browser again.`)) {
-      rmSync(cacheDir, { recursive: true, force: true });
+      removeCachePath(cacheDir);
       console.log('Removed. Run pnpm install-chrome before pnpm autorun.');
     }
   }

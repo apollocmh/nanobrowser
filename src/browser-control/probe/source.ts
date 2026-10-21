@@ -157,16 +157,23 @@ export interface ProbeApi {
   hitAccepts(target: Element, hit: Node): HitVerdict;
   describe(el: Node): string;
   armGuard(target: Element, mode: 'pointer' | 'text', lifetimeMs?: number, unfocused?: boolean): void;
+  armDragGuard(target: Element, lifetimeMs?: number): void;
+  dragInfo(target: Element): { native: boolean };
+  armNativeDragGuard(source: Element, lifetimeMs: number, ...destinations: Element[]): void;
+  armNativeDragBlock(lifetimeMs: number): void;
+  disarmNativeDragGuard(): void;
   armAncestorGuard(lifetimeMs?: number): void;
   armAwayGuard(lifetimeMs?: number): void;
   armDocumentGuard(lifetimeMs?: number): void;
-  armBlockGuard(kind: 'pointer' | 'text', lifetimeMs?: number): void;
+  armBlockGuard(kind: 'pointer' | 'text' | 'all', lifetimeMs?: number): void;
   stepGuard(lifetimeMs?: number): GuardStep;
   renewGuard(lifetimeMs?: number): boolean;
   readGuard(): GuardReport;
   disarm(): void;
   scrollInfo(el: Element | null): ScrollInfo;
   viewport(): { width: number; height: number };
+  scrollIntoView(el: Element): void;
+  restoreScroll(x: number, y: number): void;
   selectOption(el: Element, values: string[]): OptionResult;
   selectedOptions(el: Element): SelectedOption[];
   selectContents(el: Element): boolean;
@@ -210,11 +217,25 @@ export function probeMain(): void {
   if (g.__nbProbe) return;
 
   let mutationCount = 0;
+  // Only decoration hosts are ignored by mutation evidence; page capture never excludes nodes by this marker.
+  // Their children live in closed shadow roots and cannot contain any page text or interactive controls.
+  const decorationHost = (node: Node): boolean =>
+    node instanceof HTMLElement &&
+    node.tagName === 'DIV' &&
+    node.childNodes.length === 0 &&
+    node.getAttribute('aria-hidden') === 'true' &&
+    node.style.pointerEvents === 'none' &&
+    (node.hasAttribute('data-nanobrowser-border') || node.hasAttribute('data-nanobrowser-cursor'));
+  const pageMutation = (record: MutationRecord): boolean => {
+    if (record.type === 'attributes' && decorationHost(record.target)) return false;
+    if (record.type !== 'childList' || record.target !== document.documentElement) return true;
+    return [...record.addedNodes, ...record.removedNodes].some(node => !decorationHost(node));
+  };
   /** File bytes for `upload`, as base64 chunks by key, until the files are built. */
   const fileChunks = new Map<string, string[]>();
   try {
     new MutationObserver(records => {
-      mutationCount += records.length;
+      mutationCount += records.filter(pageMutation).length;
     }).observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
   } catch {
     // A document without a root yet; counting starts with the next document.
@@ -349,6 +370,8 @@ export function probeMain(): void {
     'contextmenu',
   ];
   const PRESSES = ['pointerdown', 'mousedown'];
+  const DRAG_EVENTS = ['pointermove', 'mousemove', 'pointerup', 'mouseup', 'click', 'dragenter', 'dragover', 'drop'];
+  let removeNativeDrag: (() => void) | undefined;
   const TEXT_EVENTS = ['keydown', 'keypress', 'beforeinput', 'input', 'keyup'];
   let guard: {
     report: GuardReport;
@@ -582,7 +605,7 @@ export function probeMain(): void {
         block = root instanceof ShadowRoot ? root.host : document.body;
       }
       blockObserver = new MutationObserver(records => {
-        blockCount += records.length;
+        blockCount += records.filter(pageMutation).length;
       });
       blockObserver.observe(block ?? document.documentElement, {
         subtree: true,
@@ -998,7 +1021,132 @@ export function probeMain(): void {
      * sent, so the browser does not keep it down, but must not take effect. A release is what activates (a click, Space
      * on a button), and no handler and no default action runs for a cancelled one.
      */
-    armBlockGuard(kind: 'pointer' | 'text', lifetimeMs = 4000) {
+    dragInfo(target: Element) {
+      for (let node: Element | null = target; node; node = node.parentElement) {
+        if ((node as HTMLElement).draggable) return { native: true };
+      }
+      return { native: false };
+    },
+
+    armNativeDragGuard(source: Element, lifetimeMs: number, ...destinations: Element[]) {
+      removeNativeDrag?.();
+      guard?.remove();
+      const nodes = [...new Set([source, ...destinations])];
+      const signature = (node: Element) => {
+        const facts = api.formFacts(node);
+        return JSON.stringify([
+          node.tagName,
+          api.nameSources(node),
+          api.textDigest(node),
+          facts.submitter,
+          facts.form,
+          facts.money,
+          facts.tag,
+          facts.type,
+          facts.isLink,
+          facts.field,
+          /delete|remove|trash|删除|移除/i.test(facts.classes),
+        ]);
+      };
+      const expected = new Map(nodes.map(node => [node, signature(node)]));
+      const roots = nodes.map(rootsOf);
+      const report: GuardReport = { verdict: 'none', hit: '', seen: [], accepted: 0 };
+      const cancel = (event: Event) => {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      };
+      const handler = (event: Event) => {
+        if (!event.isTrusted) return;
+        if (event.type === 'keydown' || event.type === 'keyup') {
+          if ((event as KeyboardEvent).key === 'Escape') cancel(event);
+          return;
+        }
+        note(report, event.type);
+        if (!source.isConnected || signature(source) !== expected.get(source)) {
+          report.verdict = 'cancelled';
+          report.hit = 'source changed';
+          return cancel(event);
+        }
+        const mouse = event as MouseEvent;
+        const accepted = nodes.some((node, index) => {
+          const hit = deepElementFromPoint(mouse.clientX, mouse.clientY, roots[index]);
+          return (
+            !!hit && node.isConnected && signature(node) === expected.get(node) && api.hitAccepts(node, hit).accepted
+          );
+        });
+        // Background motion is withheld from page handlers but does not cancel Chromium's native drag loop.
+        // Drop/release may reach only the exact preapproved elements with unchanged semantics.
+        if (!accepted || report.verdict === 'cancelled') {
+          if (event.type === 'drop' || event.type === 'mouseup' || event.type === 'pointerup') {
+            report.verdict = 'cancelled';
+            report.hit = 'unapproved or changed drop target';
+          }
+          return cancel(event);
+        }
+        report.verdict = 'passed';
+        report.accepted!++;
+      };
+      const events = [...DRAG_EVENTS, 'dragstart', 'keydown', 'keyup'];
+      events.forEach(type => document.addEventListener(type, handler, true));
+      const timer = setTimeout(() => {
+        report.verdict = 'cancelled';
+      }, lifetimeMs);
+      removeNativeDrag = () => {
+        clearTimeout(timer);
+        events.forEach(type => document.removeEventListener(type, handler, true));
+        removeNativeDrag = undefined;
+      };
+      lastReport = report;
+    },
+
+    disarmNativeDragGuard() {
+      removeNativeDrag?.();
+    },
+
+    /** An old browser must never enter an uncontrollable OS drag loop, including a page turning draggable on
+     * during mousemove or starting a native text-selection drag. This withholds the native default action. */
+    armNativeDragBlock(lifetimeMs: number) {
+      removeNativeDrag?.();
+      const handler = (event: Event) => {
+        if (!event.isTrusted) return;
+        lastReport.verdict = 'cancelled';
+        lastReport.hit = 'native dragging is unavailable in this browser';
+        note(lastReport, event.type);
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      };
+      window.addEventListener('dragstart', handler, true);
+      const timer = setTimeout(() => removeNativeDrag?.(), lifetimeMs);
+      removeNativeDrag = () => {
+        clearTimeout(timer);
+        window.removeEventListener('dragstart', handler, true);
+        removeNativeDrag = undefined;
+      };
+    },
+
+    armDragGuard(target: Element, lifetimeMs = 4000) {
+      guard?.remove();
+      const roots = rootsOf(target);
+      const report: GuardReport = { verdict: 'none', hit: '', seen: [], accepted: 0 };
+      const handler = (e: Event) => {
+        if (!e.isTrusted) return;
+        note(report, e.type);
+        const m = e as MouseEvent;
+        const hit = deepElementFromPoint(m.clientX, m.clientY, roots);
+        if (report.verdict !== 'cancelled' && target.isConnected && hit && api.hitAccepts(target, hit).accepted) {
+          report.verdict = 'passed';
+          report.accepted!++;
+          return;
+        }
+        report.verdict = 'cancelled';
+        report.hit = hit ? api.describe(hit) : 'nothing';
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      };
+      install(DRAG_EVENTS, handler, lifetimeMs, report);
+    },
+
+    armBlockGuard(kind: 'pointer' | 'text' | 'all', lifetimeMs = 4000) {
       guard?.remove();
       const report: GuardReport = { verdict: 'cancelled', hit: 'withheld', seen: [] };
       const handler = (e: Event) => {
@@ -1007,7 +1155,13 @@ export function probeMain(): void {
         e.preventDefault();
         e.stopImmediatePropagation();
       };
-      install(kind === 'pointer' ? POINTER_EVENTS : TEXT_EVENTS, handler, lifetimeMs, report);
+      const pointer = [...POINTER_EVENTS, ...DRAG_EVENTS, 'dragstart', 'dragend'];
+      install(
+        kind === 'all' ? [...pointer, ...TEXT_EVENTS] : kind === 'pointer' ? pointer : TEXT_EVENTS,
+        handler,
+        lifetimeMs,
+        report,
+      );
     },
 
     /** Between two keys of a sequence: renews the text guard and says where focus is now. */
@@ -1060,6 +1214,14 @@ export function probeMain(): void {
     /** The frame's viewport in CSS pixels, scrollbars included (the layout viewport leaves them out). */
     viewport() {
       return { width: window.innerWidth, height: window.innerHeight };
+    },
+
+    scrollIntoView(el: Element) {
+      Element.prototype.scrollIntoView.call(el, { block: 'nearest', inline: 'nearest', behavior: 'auto' });
+    },
+
+    restoreScroll(x: number, y: number) {
+      window.scrollTo({ left: x, top: y, behavior: 'auto' });
     },
 
     /** Scroll offsets and sizes of an element, or of the document when el is null. */

@@ -3,6 +3,7 @@
 // the default; Next waits for that, and Set it later is turned off by it; the tips show; Finish marks onboarding done.
 // Cloud providers need keys and the network, so they are not checked here.
 import { DEFAULT_SETTINGS } from '@src/store/settings';
+import { brand } from '@src/brand';
 import type { ProviderConfig } from '@src/store/settings';
 import { defineCheck } from './registry';
 import { sleep, waitForLoad } from './helpers';
@@ -64,8 +65,12 @@ defineCheck({
     await waitForLoad(welcome.id!);
     await sleep(600);
     try {
-      const first = await bodyWith('Welcome to Nanobrowser');
-      const coachMark = first.includes('Pin Nanobrowser to the toolbar');
+      const first = await bodyWith(`Welcome to ${brand.name}`);
+      const coachMark = first.includes(
+        typeof chrome.action.getUserSettings === 'function'
+          ? `Pin ${brand.name} to the toolbar`
+          : `Open ${brand.name} from the toolbar`,
+      );
       const welcomeImage = await chrome.tabs.captureVisibleTab(welcome.windowId, { format: 'png' });
       await page('click', { label: 'Next' });
       await bodyWith('Pick a model: run one on your computer');
@@ -106,7 +111,7 @@ defineCheck({
         settingsOpened,
         locked,
         readinessSaid:
-          readiness.includes('Choose a model to start') && readiness.includes('Nanobrowser needs a model to chat.'),
+          readiness.includes('Choose a model to start') && readiness.includes(`${brand.name} needs a model to chat.`),
         coachMark,
         nextWaits,
         laterOff,

@@ -1,3 +1,4 @@
+import '@src/compat/bootstrap';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import { App } from './App';

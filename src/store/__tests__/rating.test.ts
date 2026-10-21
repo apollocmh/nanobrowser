@@ -1,3 +1,4 @@
+import { brand } from '@src/brand';
 import { describe, expect, it } from 'vitest';
 import {
   NO_ANSWER,
@@ -90,9 +91,9 @@ describe('the rating ask', () => {
     expect(ratingShowsIn(runs(usage, ['2026-10-04']), answer, 'c1', 0, at('2026-10-04', 13))).toBe(true);
   });
 
-  it("opens Edge's store in Edge and the Chrome Web Store elsewhere", () => {
+  it('uses only the store destinations configured for this build', () => {
     const chrome = 'Mozilla/5.0 (Macintosh) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36';
-    expect(ratingUrl(chrome)).toContain('chromewebstore.google.com/detail/nanobrowser-ai-web-agent/');
-    expect(ratingUrl(`${chrome} Edg/141.0.0.0`)).toContain('microsoftedge.microsoft.com/addons/detail/');
+    expect(ratingUrl(chrome)).toBe(brand.chromeStore);
+    expect(ratingUrl(`${chrome} Edg/141.0.0.0`)).toBe(brand.edgeStore);
   });
 });

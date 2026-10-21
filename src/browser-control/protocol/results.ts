@@ -95,6 +95,7 @@ export interface FindMatch {
 }
 
 export interface ScreenshotData {
+  capture?: { method: 'native' | 'viewport-override'; pageMayHaveReacted: boolean; restored: boolean };
   mimeType: 'image/png';
   /** Base64 without the data: prefix. */
   base64: string;

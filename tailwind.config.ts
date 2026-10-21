@@ -1,6 +1,6 @@
 import type { Config } from 'tailwindcss';
 
-const token = (name: string) => `rgb(var(--nb-${name}) / <alpha-value>)`;
+const token = (name: string) => `rgba(var(--nb-${name}), <alpha-value>)`;
 
 export default {
   content: ['./src/**/*.{ts,tsx}', './entrypoints/**/*.html'],
@@ -43,8 +43,8 @@ export default {
         ],
       },
       boxShadow: {
-        soft: '0 1px 2px rgb(var(--nb-shadow) / 0.06), 0 8px 24px rgb(var(--nb-shadow) / 0.08)',
-        pop: '0 2px 6px rgb(var(--nb-shadow) / 0.08), 0 16px 40px rgb(var(--nb-shadow) / 0.16)',
+        soft: '0 1px 2px rgba(var(--nb-shadow), 0.06), 0 8px 24px rgba(var(--nb-shadow), 0.08)',
+        pop: '0 2px 6px rgba(var(--nb-shadow), 0.08), 0 16px 40px rgba(var(--nb-shadow), 0.16)',
       },
     },
   },

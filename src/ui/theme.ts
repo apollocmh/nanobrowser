@@ -1,6 +1,7 @@
 // The theme: system, light or dark, applied with Tailwind's `dark` class.
 // public/theme-init.js applies the stored choice before first paint; this module keeps it current.
 export type ThemePreference = 'system' | 'light' | 'dark';
+import { brand } from '@src/brand';
 
 const KEY = 'nb.theme';
 const media = () => matchMedia('(prefers-color-scheme: dark)');
@@ -22,6 +23,9 @@ export function applyTheme(pref: ThemePreference): void {
   }
   const dark = pref === 'dark' || (pref === 'system' && media().matches);
   document.documentElement.classList.toggle('dark', dark);
+  document.documentElement.style.setProperty('--nb-accent', brand.accent.replace(/ /g, ','));
+  document.documentElement.style.setProperty('--nb-accent-strong', brand.accentStrong.replace(/ /g, ','));
+  document.documentElement.style.setProperty('--nb-sky', brand.sky.replace(/ /g, ','));
 }
 
 /** Follows the system's scheme while the preference is "system". */

@@ -7,7 +7,7 @@ import type { ScrollInfo } from '../../probe';
 import type { ToolContext, ToolOutcome } from '../controller';
 import { resolveTarget } from '../interaction/resolve';
 import type { ResolvedTarget } from '../interaction/resolve';
-import { waitForActionable } from '../interaction/actionability';
+import { scrollIntoView, waitForActionable } from '../interaction/actionability';
 import { dispatchClick, dispatchHover, dispatchWheel } from '../interaction/pointer';
 import { withEvidence } from '../interaction/evidence';
 import { preflightNavigation } from '../interaction/preflight';
@@ -203,11 +203,8 @@ export async function scroll(ctx: ToolContext, args: ScrollArgs): Promise<ToolOu
   // Scrolling to an element: bring it into view.
   if (args.to && typeof args.to === 'object') {
     return withTarget(ctx, args.to, async target => {
-      const { cdp } = await ctx.attach();
       ctx.tab().actionSeq++;
-      await cdp.send(target.frame.sessionId, 'DOM.scrollIntoViewIfNeeded', {
-        backendNodeId: target.record.backendNodeId,
-      });
+      await scrollIntoView(ctx, target);
       const receipt: ActionReceipt = {
         action: 'scroll',
         target: `to [${target.record.ref}] ${target.description}`,
